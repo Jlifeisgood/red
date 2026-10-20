@@ -1,22 +1,29 @@
 """Telegram-бот для подготовки к тесту по философии (300 вопросов).
 
 Запуск:  BOT_TOKEN=... python -m bot.main
+
+Локально бот работает через long polling. Если задана переменная WEBHOOK_URL
+(или RENDER_EXTERNAL_URL, которую Render выставляет сам), бот поднимает
+HTTP-сервер на порту PORT и получает обновления через webhook.
 """
 
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import html
 import logging
 import os
 import random
 from pathlib import Path
 
+from aiohttp import web
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import Command, CommandStart
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
 from .questions import Question, load_questions
 from .quiz import LETTERS, QuizSession, blocks, grade
@@ -277,7 +284,15 @@ async def cb_answer(cb: CallbackQuery) -> None:
     _, position, option = cb.data.split(":")
     position, option = int(position), int(option)
 
-    if session is None or session.finished or position != session.position:
+    if session is None:
+        # Сессии живут в памяти и пропадают при перезапуске бота.
+        await cb.answer("Тест прервался, начните заново.")
+        await cb.message.answer(
+            "Похоже, бот перезапускался и текущий тест прервался. Выберите режим заново:",
+            reply_markup=main_menu_kb(),
+        )
+        return
+    if session.finished or position != session.position:
         await cb.answer("Этот вопрос уже не активен.")
         return
 
@@ -321,10 +336,44 @@ async def main() -> None:
     bot = Bot(token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher()
     dp.include_router(router)
+
+    base_url = os.environ.get("WEBHOOK_URL") or os.environ.get("RENDER_EXTERNAL_URL")
     try:
-        await dp.start_polling(bot)
+        if base_url:
+            await run_webhook(bot, dp, token, base_url.rstrip("/"), int(os.environ.get("PORT", "8080")))
+        else:
+            await bot.delete_webhook()
+            await dp.start_polling(bot)
     finally:
         storage.close()
+
+
+async def run_webhook(bot: Bot, dp: Dispatcher, token: str, base_url: str, port: int) -> None:
+    # Секрет выводится из токена, чтобы не заводить отдельную переменную окружения.
+    secret = hashlib.sha256(token.encode()).hexdigest()[:32]
+    path = f"/webhook/{secret[:16]}"
+
+    async def on_startup(bot: Bot) -> None:
+        await bot.set_webhook(f"{base_url}{path}", secret_token=secret)
+
+    async def health(_: web.Request) -> web.Response:
+        return web.Response(text="ok")
+
+    dp.startup.register(on_startup)
+    app = web.Application()
+    app.router.add_get("/", health)
+    app.router.add_get("/health", health)
+    SimpleRequestHandler(dispatcher=dp, bot=bot, secret_token=secret).register(app, path=path)
+    setup_application(app, dp, bot=bot)
+
+    runner = web.AppRunner(app)
+    await runner.setup()
+    await web.TCPSite(runner, host="0.0.0.0", port=port).start()
+    logging.info("Webhook-сервер запущен на порту %s", port)
+    try:
+        await asyncio.Event().wait()
+    finally:
+        await runner.cleanup()
 
 
 if __name__ == "__main__":
