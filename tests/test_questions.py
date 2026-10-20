@@ -48,3 +48,12 @@ def test_parse_rejects_question_without_correct_answer():
 def test_parse_rejects_two_correct_answers():
     with pytest.raises(QuestionFormatError):
         parse_questions("1. Вопрос\n+ да\n+ тоже да\n- нет\n")
+
+
+def test_correct_answer_is_not_given_away_by_length(questions):
+    # Правильный ответ не должен заметно выделяться длиной среди вариантов.
+    biased = [
+        q.id for q in questions
+        if len(q.correct) > 30 and len(q.correct) > 1.3 * max(len(w) for w in q.wrong)
+    ]
+    assert len(biased) <= 3, biased
