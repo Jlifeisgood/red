@@ -1,0 +1,514 @@
+<title>Тренажёр по философии</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: одна узкая колонка-«экзаменационный лист», экраны меню / вопрос / итог / ключ сменяют друг друга */
+:root {
+  --bg: #f3f5f8;
+  --surface: #ffffff;
+  --line: #d9dfe8;
+  --fg: #16202e;
+  --muted: #5b6678;
+  --lapis: #1f47b8;
+  --lapis-soft: #e3e9fa;
+  --turq: #0b8a84;
+  --good: #1d7a3e;
+  --good-soft: #e1f3e7;
+  --bad: #b3261e;
+  --bad-soft: #fbe5e3;
+  --f-display: "Unbounded", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Golos Text", "Segoe UI", Roboto, system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f141c; --surface: #171e29; --line: #2a3445; --fg: #e6ebf3; --muted: #9aa6b8;
+    --lapis: #7d9bff; --lapis-soft: #1c2a4d; --turq: #3cc2ba;
+    --good: #5fd08a; --good-soft: #15301f; --bad: #ff8a80; --bad-soft: #3a1a18;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f141c; --surface: #171e29; --line: #2a3445; --fg: #e6ebf3; --muted: #9aa6b8;
+  --lapis: #7d9bff; --lapis-soft: #1c2a4d; --turq: #3cc2ba;
+  --good: #5fd08a; --good-soft: #15301f; --bad: #ff8a80; --bad-soft: #3a1a18;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.5 var(--f-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 40px;
+}
+.wrap { max-width: 680px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+h1, h2 { font-family: var(--f-display); font-weight: 700; text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: 1.55rem; line-height: 1.2; }
+h2 { font-size: 1.1rem; line-height: 1.3; }
+p { margin: 0; }
+.muted { color: var(--muted); }
+.mono { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.label { font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+
+/* шапка с узором, отсылающим к изразцам */
+.masthead { display: flex; flex-direction: column; gap: 10px; }
+.tiles {
+  height: 10px; border-radius: 3px;
+  background:
+    repeating-linear-gradient(45deg, var(--lapis) 0 6px, transparent 6px 12px),
+    repeating-linear-gradient(-45deg, var(--turq) 0 6px, transparent 6px 12px);
+  opacity: .85;
+}
+
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--lapis); outline-offset: 2px; }
+
+.btn {
+  border: 1px solid var(--line); background: var(--surface); border-radius: 10px;
+  padding: 12px 16px; min-height: 48px; text-align: left; font-weight: 500;
+}
+.btn:hover { border-color: var(--lapis); }
+.btn.primary { background: var(--lapis); border-color: var(--lapis); color: var(--surface); text-align: center; font-weight: 600; }
+.btn.ghost { background: transparent; }
+.btn small { display: block; color: var(--muted); font-weight: 400; font-size: 0.85rem; }
+.btn.primary small { color: inherit; opacity: .8; }
+
+.section { display: flex; flex-direction: column; gap: 10px; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.grid3 .btn { text-align: center; padding: 10px 6px; }
+.block-btn .mono { font-size: 0.95rem; }
+.block-btn .best { display: block; font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+@media (max-width: 420px) { .grid2 { grid-template-columns: 1fr; } }
+
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.stats div { background: var(--surface); padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.stats b { font-family: var(--f-display); font-size: 1.15rem; font-weight: 500; font-variant-numeric: tabular-nums; }
+.stats span { font-size: 0.8rem; color: var(--muted); }
+
+/* экран вопроса */
+.qhead { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--turq); width: 0; transition: width .25s; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+.qnum { font-family: var(--f-mono); color: var(--lapis); font-size: 0.9rem; }
+.qtext { font-size: 1.15rem; font-weight: 600; line-height: 1.4; white-space: pre-line; }
+.options { display: flex; flex-direction: column; gap: 10px; }
+.opt {
+  display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 10px; align-items: start;
+  border: 1.5px solid var(--line); background: var(--bg); border-radius: 10px; padding: 12px; text-align: left; min-height: 52px;
+}
+.opt .let { font-family: var(--f-mono); width: 28px; height: 28px; border-radius: 6px; display: grid; place-items: center; background: var(--surface); border: 1px solid var(--line); font-size: 0.85rem; }
+.opt:hover:not(:disabled) { border-color: var(--lapis); }
+.opt:disabled { cursor: default; }
+.opt.good { border-color: var(--good); background: var(--good-soft); }
+.opt.good .let { background: var(--good); color: var(--surface); border-color: var(--good); }
+.opt.bad { border-color: var(--bad); background: var(--bad-soft); }
+.opt.bad .let { background: var(--bad); color: var(--surface); border-color: var(--bad); }
+.opt.dim { opacity: .55; }
+.verdict { font-weight: 600; }
+.verdict.good { color: var(--good); }
+.verdict.bad { color: var(--bad); }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.actions .btn { flex: 1 1 160px; text-align: center; }
+
+/* итог */
+.score { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.score .pct { font-family: var(--f-display); font-size: 3rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.pill { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 0.85rem; font-weight: 600; }
+.pill.g5, .pill.g4 { background: var(--good-soft); color: var(--good); }
+.pill.g3 { background: var(--lapis-soft); color: var(--lapis); }
+.pill.g2 { background: var(--bad-soft); color: var(--bad); }
+.review { display: flex; flex-direction: column; gap: 10px; }
+.review article { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; background: var(--surface); display: flex; flex-direction: column; gap: 6px; }
+.review .yours { color: var(--bad); }
+.review .right { color: var(--good); }
+.review .yours::before { content: "✗ "; }
+.review .right::before { content: "✓ "; }
+
+/* ключ */
+.search { width: 100%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--fg); font: inherit; min-height: 48px; }
+.key { display: flex; flex-direction: column; gap: 8px; }
+.key article { border-bottom: 1px solid var(--line); padding: 10px 0; display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 8px; }
+.key .mono { color: var(--lapis); font-size: 0.85rem; padding-top: 2px; }
+.key .q { font-weight: 600; white-space: pre-line; }
+.key .a { color: var(--good); }
+.top-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.linkbtn { background: none; border: none; color: var(--lapis); padding: 8px 0; font-weight: 600; min-height: 40px; }
+footer { font-size: 0.8rem; color: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) { .bar i { transition: none; } }
+</style>
+
+<div class="wrap" id="app">
+  <!-- МЕНЮ -->
+  <section id="screen-home" class="wrap" style="gap:24px">
+    <header class="masthead">
+      <div class="tiles" aria-hidden="true"></div>
+      <span class="label">ТГЭУ · Философия · 300 вопросов</span>
+      <h1>Тренажёр по философии</h1>
+      <p class="muted">Выберите режим. Варианты ответов каждый раз перемешиваются, после ответа сразу видно правильный.</p>
+    </header>
+
+    <button class="btn primary" id="resume" hidden></button>
+
+    <div class="stats" aria-label="Статистика">
+      <div><b id="st-answered">0</b><span>ответов</span></div>
+      <div><b id="st-pct">—</b><span>правильных</span></div>
+      <div><b id="st-mist">0</b><span>в ошибках</span></div>
+    </div>
+
+    <div class="section">
+      <span class="label">Как на экзамене</span>
+      <div class="grid2">
+        <button class="btn" data-start="random:25">Случайные 25<small>≈ 10 минут</small></button>
+        <button class="btn" data-start="random:50">Случайные 50<small>≈ 20 минут</small></button>
+      </div>
+    </div>
+
+    <div class="section">
+      <span class="label">Учить блоками по 25</span>
+      <div class="grid3" id="blocks"></div>
+    </div>
+
+    <div class="section">
+      <span class="label">Полный прогон</span>
+      <div class="grid2">
+        <button class="btn" data-start="all:order">Все 300 по порядку</button>
+        <button class="btn" data-start="all:shuffle">Все 300 вперемешку</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <span class="label">Повторение</span>
+      <div class="grid2">
+        <button class="btn" data-start="mistakes" id="btn-mistakes">Работа над ошибками<small id="mist-hint">Ошибок пока нет</small></button>
+        <button class="btn" id="btn-key">Ключ с ответами<small>Поиск по всем вопросам</small></button>
+      </div>
+    </div>
+
+    <footer class="top-row">
+      <span>Оценка: от 90% — 5, от 70% — 4, от 60% — 3.</span>
+      <button class="linkbtn" id="reset">Сбросить статистику</button>
+    </footer>
+  </section>
+
+  <!-- ВОПРОС -->
+  <section id="screen-quiz" class="wrap" hidden>
+    <div class="qhead">
+      <span class="label" id="q-title"></span>
+      <span class="mono muted" id="q-progress"></span>
+    </div>
+    <div class="bar"><i id="q-bar"></i></div>
+    <div class="card">
+      <span class="qnum" id="q-num"></span>
+      <p class="qtext" id="q-text"></p>
+      <div class="options" id="q-options"></div>
+      <p class="verdict" id="q-verdict" hidden></p>
+    </div>
+    <div class="actions">
+      <button class="btn ghost" id="q-stop">Завершить тест</button>
+      <button class="btn primary" id="q-next" hidden>Дальше</button>
+    </div>
+  </section>
+
+  <!-- ИТОГ -->
+  <section id="screen-result" class="wrap" hidden>
+    <span class="label" id="r-title"></span>
+    <div class="score">
+      <span class="pct" id="r-pct"></span>
+      <span class="pill" id="r-grade"></span>
+    </div>
+    <p class="muted" id="r-line"></p>
+    <div class="actions">
+      <button class="btn primary" id="r-mistakes">Работа над ошибками</button>
+      <button class="btn" id="r-home">В меню</button>
+    </div>
+    <div class="section" id="r-review-wrap">
+      <h2>Разбор ошибок</h2>
+      <div class="review" id="r-review"></div>
+    </div>
+  </section>
+
+  <!-- КЛЮЧ -->
+  <section id="screen-key" class="wrap" hidden>
+    <div class="top-row">
+      <h2>Ключ с ответами</h2>
+      <button class="linkbtn" id="k-home">← В меню</button>
+    </div>
+    <input class="search" id="k-search" type="search" placeholder="Поиск: слово из вопроса или ответа" autocomplete="off">
+    <p class="muted" id="k-count"></p>
+    <div class="key" id="k-list"></div>
+  </section>
+</div>
+
+<script>
+const QUESTIONS = /*__QUESTIONS__*/[];
+const BY_ID = new Map(QUESTIONS.map(q => [q.id, q]));
+const LETTERS = "ABCDEF";
+const BLOCK = 25;
+
+const store = {
+  get(key, fallback) {
+    try { const v = localStorage.getItem("fq." + key); return v ? JSON.parse(v) : fallback; }
+    catch { return fallback; }
+  },
+  set(key, value) {
+    try { localStorage.setItem("fq." + key, JSON.stringify(value)); } catch {}
+  },
+  del(key) { try { localStorage.removeItem("fq." + key); } catch {} },
+};
+
+let stats = store.get("stats", { answered: 0, correct: 0, finished: 0 });
+let mistakes = new Set(store.get("mistakes", []));
+let best = store.get("best", {});   // лучший результат по блокам, %
+let session = store.get("session", null);
+
+const $ = id => document.getElementById(id);
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+
+function grade(p) {
+  if (p >= 90) return ["5 · отлично", "g5"];
+  if (p >= 70) return ["4 · хорошо", "g4"];
+  if (p >= 60) return ["3 · удовлетворительно", "g3"];
+  return ["2 · неудовлетворительно", "g2"];
+}
+
+function show(name) {
+  for (const s of ["home", "quiz", "result", "key"]) $("screen-" + s).hidden = s !== name;
+  window.scrollTo(0, 0);
+}
+
+// ---------- меню ----------
+function renderHome() {
+  $("st-answered").textContent = stats.answered;
+  $("st-pct").textContent = stats.answered ? Math.round(stats.correct * 100 / stats.answered) + "%" : "—";
+  $("st-mist").textContent = mistakes.size;
+  $("mist-hint").textContent = mistakes.size ? `${mistakes.size} вопр. на повтор` : "Ошибок пока нет";
+
+  const blocks = $("blocks");
+  blocks.replaceChildren();
+  for (let i = 0; i < QUESTIONS.length; i += BLOCK) {
+    const part = QUESTIONS.slice(i, i + BLOCK);
+    const key = `block:${i / BLOCK}`;
+    const b = el("button", "btn block-btn");
+    b.dataset.start = key;
+    b.append(el("span", "mono", `${part[0].id}–${part[part.length - 1].id}`));
+    b.append(el("span", "best", best[key] != null ? `лучший ${best[key]}%` : "не пройден"));
+    blocks.append(b);
+  }
+
+  const resume = $("resume");
+  if (session && session.pos < session.items.length) {
+    resume.hidden = false;
+    resume.replaceChildren(document.createTextNode(`Продолжить: ${session.title}`),
+      el("small", null, `вопрос ${session.pos + 1} из ${session.items.length}`));
+  } else {
+    resume.hidden = true;
+  }
+  show("home");
+}
+
+function startMode(mode) {
+  let title, list;
+  const [kind, arg] = mode.split(":");
+  if (kind === "random") {
+    title = `Случайные ${arg}`;
+    list = shuffle(QUESTIONS).slice(0, Number(arg));
+  } else if (kind === "block") {
+    list = QUESTIONS.slice(Number(arg) * BLOCK, Number(arg) * BLOCK + BLOCK);
+    title = `Вопросы ${list[0].id}–${list[list.length - 1].id}`;
+  } else if (kind === "all") {
+    title = arg === "shuffle" ? "Все 300 вперемешку" : "Все 300 по порядку";
+    list = arg === "shuffle" ? shuffle(QUESTIONS) : QUESTIONS.slice();
+  } else if (kind === "mistakes") {
+    list = shuffle([...mistakes].map(id => BY_ID.get(id)).filter(Boolean));
+    title = "Работа над ошибками";
+    if (!list.length) { renderHome(); return; }
+  }
+  session = {
+    mode, title, pos: 0, correct: 0, picked: null,
+    // order — перестановка вариантов: индексы в q.a, где 0 — правильный ответ
+    items: list.map(q => ({ id: q.id, order: shuffle(q.a.map((_, i) => i)), chosen: null })),
+  };
+  store.set("session", session);
+  renderQuestion();
+}
+
+// ---------- вопрос ----------
+function renderQuestion() {
+  const item = session.items[session.pos];
+  const q = BY_ID.get(item.id);
+  $("q-title").textContent = session.title;
+  $("q-progress").textContent = `${session.pos + 1} / ${session.items.length} · ✓ ${session.correct}`;
+  $("q-bar").style.width = (session.pos / session.items.length * 100) + "%";
+  $("q-num").textContent = `№${q.id}`;
+  $("q-text").textContent = q.q;
+  $("q-verdict").hidden = true;
+  $("q-next").hidden = true;
+  resetStop();
+
+  const box = $("q-options");
+  box.replaceChildren();
+  item.order.forEach((ai, i) => {
+    const b = el("button", "opt");
+    b.id = `opt-${i}`;
+    b.append(el("span", "let", LETTERS[i]), el("span", null, q.a[ai]));
+    b.addEventListener("click", () => choose(i));
+    box.append(b);
+  });
+  if (item.chosen != null) paintAnswer(item);
+  show("quiz");
+}
+
+function choose(i) {
+  const item = session.items[session.pos];
+  if (item.chosen != null) return;
+  item.chosen = i;
+  const ok = item.order[i] === 0;
+  if (ok) { session.correct++; mistakes.delete(item.id); }
+  else { mistakes.add(item.id); }
+  stats.answered++;
+  if (ok) stats.correct++;
+  store.set("stats", stats);
+  store.set("mistakes", [...mistakes]);
+  store.set("session", session);
+  $("q-progress").textContent = `${session.pos + 1} / ${session.items.length} · ✓ ${session.correct}`;
+  paintAnswer(item);
+}
+
+function paintAnswer(item) {
+  const right = item.order.indexOf(0);
+  [...$("q-options").children].forEach((b, i) => {
+    b.disabled = true;
+    if (i === right) b.classList.add("good");
+    else if (i === item.chosen) b.classList.add("bad");
+    else b.classList.add("dim");
+  });
+  const v = $("q-verdict");
+  const ok = item.chosen === right;
+  v.className = "verdict " + (ok ? "good" : "bad");
+  v.textContent = ok ? "Верно" : `Неверно. Правильный ответ: ${LETTERS[right]}`;
+  v.hidden = false;
+  const next = $("q-next");
+  next.textContent = session.pos + 1 < session.items.length ? "Дальше" : "Показать результат";
+  next.hidden = false;
+  next.focus({ preventScroll: true });
+}
+
+function nextQuestion() {
+  session.pos++;
+  store.set("session", session);
+  if (session.pos >= session.items.length) finish();
+  else renderQuestion();
+}
+
+let stopArmed = false;
+function resetStop() { stopArmed = false; $("q-stop").textContent = "Завершить тест"; }
+function stopClicked() {
+  if (!stopArmed) { stopArmed = true; $("q-stop").textContent = "Точно завершить? Нажмите ещё раз"; return; }
+  // незаконченный текущий вопрос не засчитываем
+  const cur = session.items[session.pos];
+  if (cur && cur.chosen != null) session.pos++;
+  finish();
+}
+
+// ---------- итог ----------
+function finish() {
+  const answered = session.items.slice(0, session.pos).filter(it => it.chosen != null);
+  const total = answered.length;
+  const pct = total ? Math.round(session.correct * 100 / total) : 0;
+  if (total) { stats.finished++; store.set("stats", stats); }
+  if (session.mode.startsWith("block:") && total === session.items.length) {
+    best[session.mode] = Math.max(best[session.mode] ?? 0, pct);
+    store.set("best", best);
+  }
+
+  const [g, cls] = grade(pct);
+  $("r-title").textContent = `${session.title} · завершено`;
+  $("r-pct").textContent = pct + "%";
+  const pill = $("r-grade"); pill.textContent = g; pill.className = "pill " + cls;
+  $("r-line").textContent = `Правильно ${session.correct} из ${total}` +
+    (total < session.items.length ? ` (отвечено ${total} из ${session.items.length})` : "");
+
+  const wrong = answered.filter(it => it.order[it.chosen] !== 0);
+  const review = $("r-review");
+  review.replaceChildren();
+  for (const it of wrong) {
+    const q = BY_ID.get(it.id);
+    const a = el("article");
+    a.append(el("span", "qnum", `№${q.id}`), el("p", "qtext", q.q),
+      el("span", "yours", q.a[it.order[it.chosen]]), el("span", "right", q.a[0]));
+    review.append(a);
+  }
+  $("r-review-wrap").hidden = wrong.length === 0;
+  $("r-mistakes").hidden = mistakes.size === 0;
+
+  session = null;
+  store.del("session");
+  show("result");
+}
+
+// ---------- ключ ----------
+function renderKey() {
+  const term = $("k-search").value.trim().toLowerCase();
+  const list = $("k-list");
+  list.replaceChildren();
+  let n = 0;
+  for (const q of QUESTIONS) {
+    if (term && !(q.q.toLowerCase().includes(term) || q.a[0].toLowerCase().includes(term) || String(q.id) === term)) continue;
+    n++;
+    const a = el("article");
+    const body = el("div");
+    body.append(el("p", "q", q.q), el("p", "a", q.a[0]));
+    a.append(el("span", "mono", `№${q.id}`), body);
+    list.append(a);
+  }
+  $("k-count").textContent = term ? `Найдено: ${n}` : `Все ${n} вопросов`;
+}
+
+// ---------- события ----------
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-start]");
+  if (b) startMode(b.dataset.start);
+});
+$("resume").addEventListener("click", renderQuestion);
+$("q-next").addEventListener("click", nextQuestion);
+$("q-stop").addEventListener("click", stopClicked);
+$("r-home").addEventListener("click", renderHome);
+$("r-mistakes").addEventListener("click", () => startMode("mistakes"));
+$("btn-key").addEventListener("click", () => { renderKey(); show("key"); });
+$("k-home").addEventListener("click", renderHome);
+$("k-search").addEventListener("input", renderKey);
+
+let resetArmed = false;
+$("reset").addEventListener("click", () => {
+  if (!resetArmed) { resetArmed = true; $("reset").textContent = "Нажмите ещё раз для сброса"; return; }
+  resetArmed = false;
+  stats = { answered: 0, correct: 0, finished: 0 }; mistakes = new Set(); best = {};
+  ["stats", "mistakes", "best"].forEach(k => store.del(k));
+  $("reset").textContent = "Сбросить статистику";
+  renderHome();
+});
+
+document.addEventListener("keydown", e => {
+  if ($("screen-quiz").hidden || e.target.tagName === "INPUT") return;
+  const i = "1234".indexOf(e.key) >= 0 ? "1234".indexOf(e.key) : "abcd".indexOf(e.key.toLowerCase());
+  if (i >= 0 && session && session.items[session.pos].chosen == null) choose(i);
+  else if (e.key === "Enter" && !$("q-next").hidden) { e.preventDefault(); nextQuestion(); }
+});
+
+renderHome();
+</script>
