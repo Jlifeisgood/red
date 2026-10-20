@@ -31,6 +31,29 @@ cp .env.example .env   # впишите BOT_TOKEN
 python -m bot.main
 ```
 
+## Постоянная работа на сервере (Linux + systemd)
+
+```bash
+sudo apt install -y python3 python3-venv git
+sudo useradd -r -m -d /opt/philosophy-bot bot
+sudo -u bot git clone -b ccr-141880db-zbygkk https://github.com/jlifeisgood/red.git /opt/philosophy-bot
+cd /opt/philosophy-bot
+sudo -u bot python3 -m venv .venv
+sudo -u bot .venv/bin/pip install -r requirements.txt
+sudo -u bot cp .env.example .env    # впишите BOT_TOKEN, DB_PATH=/opt/philosophy-bot/bot.db
+sudo cp deploy/philosophy-bot.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now philosophy-bot
+```
+
+Бот запускается вместе с сервером и перезапускается после падения.
+
+- статус: `systemctl status philosophy-bot`
+- логи: `journalctl -u philosophy-bot -f`
+- обновление: `cd /opt/philosophy-bot && sudo -u bot git pull && sudo systemctl restart philosophy-bot`
+
+С одним токеном может работать только один экземпляр бота. Если бот запущен ещё где-то, например на вашем компьютере, его нужно остановить.
+
 ## Вопросы
 
 Вопросы лежат в `data/questions_*.txt` в простом текстовом формате:

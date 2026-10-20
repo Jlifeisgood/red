@@ -1,0 +1,16 @@
+[Unit]
+Description=Telegram-бот: тест по философии
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bot
+WorkingDirectory=/opt/philosophy-bot
+EnvironmentFile=/opt/philosophy-bot/.env
+ExecStart=/opt/philosophy-bot/.venv/bin/python -m bot.main
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
