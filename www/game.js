@@ -342,11 +342,20 @@ function load() {
 }
 
 function fx(kind) {
-  const el = kind === 'shake' ? $('app') : $('st-ic');
+  if (kind === 'shake') {
+    const h = $('sc-hero'), app = $('app');
+    [app, h].forEach((el, i) => { const c = i ? 'hurt' : 'shake'; el.classList.remove(c); void el.offsetWidth; el.classList.add(c); setTimeout(() => el.classList.remove(c), 320); });
+    return;
+  }
+  const el = $('en-ic');
   if (!el) return;
-  const c = kind === 'shake' ? 'shake' : 'hitflash';
+  el.classList.remove('hitflash'); void el.offsetWidth; el.classList.add('hitflash');
+  setTimeout(() => el.classList.remove('hitflash'), 320);
+}
+function lunge(who) {
+  const el = $(who === 'hero' ? 'sc-hero' : 'sc-enemy'), c = who === 'hero' ? 'lunge-h' : 'lunge-e';
   el.classList.remove(c); void el.offsetWidth; el.classList.add(c);
-  setTimeout(() => el.classList.remove(c), 320);
+  setTimeout(() => el.classList.remove(c), 380);
 }
 function floatText(text, cls, where) {
   const host = $(where);
@@ -893,6 +902,7 @@ function attack(part) {
   if (part === true) part = 'head';
   if (!PARTS[part]) part = 'body';
   const P = PARTS[part], e = S.enemy;
+  lunge('hero');
   const sure = S.firstStrike && S.passive === 'first';
   S.firstStrike = false;
   const p = hitChance(part);
@@ -903,7 +913,7 @@ function attack(part) {
     const crit = chance((has('crit') ? 0.15 : 0) + S.skills.str * 0.015);
     if (crit) d *= 2;
     e.hp -= d; log(`${crit ? 'Критический удар! ' : ''}${P.n}: <b>${d}</b> урона.`);
-    fx('hit'); floatText(`-${d}${crit ? '!' : ''}`, crit ? 'crit' : 'dmg', 'stage');
+    fx('hit'); floatText(`-${d}${crit ? '!' : ''}`, crit ? 'crit' : 'dmg', 'sc-enemy');
     sfx(crit ? 'crit' : 'hit'); if (crit) vib(60);
     if (P.eff === 'weak' && e.hp > 0) { e.weak = 3; log('Враг ослаблен: его удары слабее.'); }
     if (P.eff === 'stag' && e.hp > 0) { e.stag = 2; log('Враг шатается и может пропустить ход.'); }
@@ -942,6 +952,7 @@ function enemyTurn() {
   const skipTurn = e.stag > 0 && (e.stag--, chance(0.5));
   if (skipTurn) log(`${e.n} теряет равновесие и пропускает ход.`, 'good');
   else {
+    lunge('enemy');
     const hits = e.multi ? 2 : 1;
     const dodgeP = Math.min(0.3, S.skills.dex * 0.015);
     let landed = false;
@@ -953,7 +964,7 @@ function enemyTurn() {
       if (hits > 1) raw = Math.max(1, Math.round(raw * 0.6));
       let dmg = Math.max(1, raw - defArmor());
       if (S.defending) dmg = Math.ceil(dmg / 2);
-      S.hp -= dmg; landed = true; floatText(`-${dmg}`, 'pdmg', 'hud');
+      S.hp -= dmg; landed = true; floatText(`-${dmg}`, 'pdmg', 'sc-hero');
       log(`<span class="enemy">${e.n}</span> наносит <b>${dmg}</b> урона.`, 'bad');
     }
     if (e.weak > 0) e.weak--;
@@ -1075,15 +1086,7 @@ function render() {
     `<span>🔩${S.scrap}</span><span>🧵${S.cloth}</span><span>🧪${S.chem}</span><span>🥩${S.meat}</span><span>🌿${S.herbs}</span><span>🍄${S.shrooms}</span>` +
     `<span>🔑${S.keys}</span><span>💣${S.grenade}</span><span>⚔️ ${weapon().n}</span><span>🛡️ ${armor().n}</span>` + (S.poison ? '<span style="color:var(--hp)">☠️ яд</span>' : '') + (S.bleed ? '<span style="color:var(--hp)">🩸 кровь</span>' : '');
 
-  const st = $('stage');
-  if (S.screen === 'fight' && S.enemy) {
-    const e = S.enemy;
-    st.style.display = 'flex';
-    $('st-ic').textContent = ICONS[e.n] || '👾';
-    $('st-name').textContent = `${e.n} ${Math.max(0, e.hp)}/${e.maxHp}`;
-    $('st-hp').style.width = Math.max(0, e.hp / e.maxHp * 100) + '%';
-    $('st-tr').textContent = traitIcons(e) + (e.weak > 0 ? ' · ослаблен' : '') + (e.stag > 0 ? ' · шатается' : '');
-  } else st.style.display = 'none';
+  renderScene();
 
   const a = $('actions'); a.innerHTML = '';
   switch (S.screen) {
@@ -1097,10 +1100,10 @@ function render() {
       if (S.quest) head(a, `📞 Задание: дойти до этажа ${S.quest.floor} (осталось ${S.quest.floor - S.floor})`);
       S.rooms.forEach((r, i) => {
         const label = r.done ? `✔ ${roomName(r.type)}` : r.known ? `🚪 Дверь ${i + 1}: ${roomName(r.type)} (рентген)` : `🚪 Дверь ${i + 1}: ${r.hint}`;
-        a.appendChild(btn(label, () => openRoom(i), 'full' + (r.done ? '' : ' primary'), r.done));
+        a.appendChild(btn(label, () => enterDoor(i), 'full' + (r.done ? '' : ' primary'), r.done));
       });
       if (S.lift) {
-        if (S.lift.state === 'ok') a.appendChild(btn(`🛗 Лифт исправен — ${S.floor >= TOP ? 'на крышу' : 'ехать'} (-1 энергии)`, ride, 'full primary'));
+        if (S.lift.state === 'ok') a.appendChild(btn(`🛗 Лифт исправен — ${S.floor >= TOP ? 'на крышу' : 'ехать'} (-1 энергии)`, rideAnim, 'full primary'));
         else {
           a.appendChild(btn(`🛠 Починить лифт — ${costText(S.lift.cost)}`, repairLift, 'full primary', !canPay(S.lift.cost)));
           a.appendChild(btn('🪢 Лезть по тросу (-4 энергии, риск травмы)', climbRope, 'full'));
@@ -1265,6 +1268,130 @@ function roomName(t) {
            event: 'Происшествие', empty: 'Пусто', vending: 'Автомат', locked: 'Запертая комната' }[t];
 }
 
+// ---------- 2D-сцена: этаж в разрезе, герой ходит туда-сюда ----------
+const HERO_SVG = `<svg viewBox="0 0 40 72" aria-hidden="true">
+  <ellipse cx="20" cy="69" rx="13" ry="3" fill="rgba(0,0,0,.4)"/>
+  <rect x="13" y="44" width="6" height="24" rx="3" fill="#2b3a55"/><rect x="21" y="44" width="6" height="24" rx="3" fill="#2b3a55"/>
+  <rect x="3" y="24" width="9" height="17" rx="3" fill="#7a5c3a"/>
+  <rect x="10" y="21" width="20" height="26" rx="6" fill="#4a6fa5"/>
+  <rect x="27" y="23" width="6" height="22" rx="3" fill="#3b5b8c"/>
+  <circle cx="20" cy="13" r="9" fill="#e8c39e"/>
+  <path d="M10.5 13a9.5 9.5 0 0 1 19 0v-1.5h-19z" fill="#2f3b52"/>
+</svg>`;
+const WPN_ICON = ['✊', '🔩', '🏏', '🗡', '⚡', '🔥', '⚔'];
+const ROOM_ICON = { loot: '📦', enemy: '☠', rest: '🛏', trap: '⚠', trader: '🧳', event: '❓', empty: '·', vending: '🥤', locked: '🔒' };
+const SCREEN_ICON = { vending: '🥤', trader: '🧳', event: '❓', locked: '🔒', kitchen: '🍳', craft: '🛠', skills: '⭐', diary: '📖', ach: '🏆', meals: '🍲' };
+const DOOR_X = [12, 38, 64], LIFT_X = 89;
+let heroX = 6, sceneBusy = false, sceneKey = null, sceneMode = '', doorEls = [];
+
+function initScene() {
+  for (let i = 0; i < 3; i++) {
+    const d = document.createElement('div');
+    d.className = 'door'; d.style.left = DOOR_X[i] + '%';
+    d.innerHTML = '<div class="d-ic"></div><div class="d-leaf"><i></i></div><div class="d-n"></div>';
+    d.onclick = () => sceneTap(i);
+    $('sc-doors').appendChild(d); doorEls.push(d);
+  }
+  $('sc-lift').onclick = () => sceneTap('lift');
+  $('sc-hero').innerHTML = '<div class="hhp"><i></i></div>' + HERO_SVG + '<span class="wpn"></span>';
+  $('zones').innerHTML = ['head', 'body', 'armL', 'armR', 'legs'].map(z => `<div class="zone z-${z}" data-z="${z}"></div>`).join('');
+  $('zones').onclick = ev => {
+    const z = ev.target.dataset && ev.target.dataset.z;
+    if (!z || S.screen !== 'fight') return;
+    sfx('click'); attack(z.startsWith('arm') ? 'arms' : z);
+  };
+}
+function setHero(x, walk) {
+  const h = $('sc-hero');
+  h.classList.toggle('face-l', x < heroX);
+  if (walk) h.classList.add('walk');
+  heroX = x; h.style.left = x + '%';
+}
+function walkThen(x, fn) {
+  if (sceneBusy) return;
+  sceneBusy = true; setHero(x, true);
+  setTimeout(() => { sceneBusy = false; $('sc-hero').classList.remove('walk'); fn(); }, 520);
+}
+function enterDoor(i) {
+  const r = S.rooms[i];
+  if (S.screen !== 'map' || !r || r.done) return;
+  walkThen(DOOR_X[i], () => {
+    doorEls[i].classList.add('open'); setTimeout(() => doorEls[i].classList.remove('open'), 450);
+    openRoom(i);
+  });
+}
+function rideAnim() {
+  if (S.screen !== 'map' || !S.lift || S.lift.state !== 'ok') return;
+  walkThen(LIFT_X, () => {
+    $('sc-lift').classList.add('open'); setTimeout(() => $('sc-lift').classList.remove('open'), 500);
+    ride();
+  });
+}
+function sceneTap(i) {
+  if (sceneBusy) return;
+  if (S.screen === 'map') {
+    if (i === 'lift') { if (S.lift && S.lift.state === 'ok') rideAnim(); else log('Кабина разбита. Лифт можно починить кнопкой ниже.'); return; }
+    enterDoor(i);
+  } else if (S.screen === 'base' && S.inBase) {
+    if (i === 'lift') return walkThen(LIFT_X, returnUp);
+    [() => walkThen(DOOR_X[0], sleep),
+     () => walkThen(DOOR_X[1], () => { S.screen = 'kitchen'; render(); }),
+     () => walkThen(DOOR_X[2], () => { S.screen = 'craft'; render(); })][i]();
+  }
+}
+function renderScene() {
+  const sc = $('scene');
+  if (['start', 'help', 'settings', 'transfer'].includes(S.screen)) { sc.style.display = 'none'; return; }
+  sc.style.display = 'block';
+  const fight = S.screen === 'fight' && !!S.enemy, inBase = !!S.inBase, h = $('sc-hero');
+  const icon = fight ? '' : (SCREEN_ICON[S.screen] || '');
+  sc.className = 'panel ' + (inBase ? 'base' : 'z' + zoneOf(S.floor)) + (fight ? ' fight' : '') + (S.screen === 'dead' ? ' dead' : '') + (icon && !inBase ? ' dim' : '');
+  $('sc-sign').textContent = inBase ? 'Убежище' : `Этаж ${S.floor}`;
+  $('sc-center').textContent = icon;
+
+  // новый этаж / вход в убежище: герой входит слева
+  const key = inBase ? 'base' : S.rooms;
+  if (sceneKey !== key) {
+    sceneKey = key; sceneBusy = false;
+    h.style.transition = 'none'; h.style.left = '-6%'; heroX = -6; void h.offsetWidth; h.style.transition = '';
+    setHero(6, true); setTimeout(() => h.classList.remove('walk'), 560);
+  }
+  const mode = fight ? 'fight' : 'floor';
+  if (mode !== sceneMode) { sceneMode = mode; h.classList.remove('face-l'); }
+  h.style.left = (fight ? 16 : heroX) + '%';
+  h.querySelector('.wpn').textContent = WPN_ICON[S.wi] || '✊';
+  h.querySelector('.hhp i').style.width = Math.max(0, S.hp / S.maxHp * 100) + '%';
+
+  for (let i = 0; i < 3; i++) {
+    const d = doorEls[i], r = S.rooms[i], ic = d.querySelector('.d-ic'), n = d.querySelector('.d-n');
+    d.style.display = fight ? 'none' : '';
+    if (inBase) {
+      d.className = 'door furn'; ic.textContent = ['🛏', '🍳', '🛠'][i]; n.textContent = ['Сон', 'Кухня', 'Верстак'][i];
+    } else {
+      const known = r && (r.done || r.known);
+      d.className = 'door' + (r && r.done ? ' done' : '') + (known && r.type === 'locked' ? ' locked' : '');
+      ic.textContent = known ? ROOM_ICON[r.type] || '' : ''; n.textContent = i + 1;
+    }
+  }
+  const lift = $('sc-lift');
+  lift.style.display = fight || (!S.lift && !inBase) ? 'none' : '';
+  lift.className = 'lift ' + (inBase || (S.lift && S.lift.state === 'ok') ? 'ok' : 'broken');
+
+  const en = $('sc-enemy');
+  en.style.display = fight ? 'block' : 'none';
+  if (fight) {
+    const e = S.enemy;
+    $('en-ic').textContent = ICONS[e.n] || '👾';
+    $('en-name').textContent = `${e.n} ${Math.max(0, e.hp)}/${e.maxHp}`;
+    $('ehp').style.width = Math.max(0, e.hp / e.maxHp * 100) + '%';
+    $('en-tr').textContent = traitIcons(e) + (e.weak > 0 ? ' ослаблен' : '') + (e.stag > 0 ? ' шатается' : '');
+    document.querySelectorAll('#zones .zone').forEach(z => {
+      const part = z.dataset.z.startsWith('arm') ? 'arms' : z.dataset.z;
+      z.textContent = z.dataset.z === 'armR' ? '' : Math.round(hitChance(part) * 100) + '%';
+    });
+  }
+}
+
 // ---------- настройки, перенос сохранения ----------
 let transferMode = 'export', confirmReset = false, transferMsg = '';
 const enc = o => btoa(unescape(encodeURIComponent(JSON.stringify(o))));
@@ -1306,4 +1433,5 @@ try {
 } catch (e) {}
 
 // ---------- старт ----------
+initScene();
 if (load()) { if (!S.lift && S.screen !== 'start') newFloor(); log('Игра загружена.'); render(); } else newGame();
