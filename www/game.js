@@ -94,6 +94,17 @@ const PARTS = {
   arms: { n: 'Руки',   hit: 0.75, m: 0.8, eff: 'weak' },
   legs: { n: 'Ноги',   hit: 0.80, m: 0.8, eff: 'stag' },
 };
+const HELP = [
+  '⚡ Энергия — твои шаги. Каждая дверь и каждый подъём тратят её. На нуле ты теряешь здоровье. Еда и блюда её восстанавливают.',
+  '🚪 На этаже три двери и лифт. Подсказки у дверей могут лгать. Комнаты: склады, враги, убежища, ловушки, торговцы, события, автоматы и запертые двери.',
+  '🛗 Исправный лифт везёт наверх. Сломанный чинят материалами или обходят по тросу (дорого и опасно). Исправный лифт также ведёт вниз, в убежище.',
+  '🏠 Убежище: сон лечит, кухня готовит блюда, верстак создаёт снаряжение. Верстак и кухню можно улучшать.',
+  '⚔️ В бою целься: голова бьёт сильнее, но чаще промахивается. Руки ослабляют врага, ноги сбивают его с шага. Смотри на особенности врагов.',
+  '⭐ За уровень даются очки навыков. У каждого оружия свой навык, и он делает его сильнее. Перки выбираются при повышении уровня.',
+  '🔑 Запертые комнаты открываются ключом или силой. Внутри лучшая добыча.',
+  '📞 Иногда звонит телефон: приди на нужный этаж вовремя и получи награду.',
+  '🏁 Твои выборы в событиях и найденные записки влияют на концовку. Всего их четыре.',
+];
 const DIFFS = ['Легко', 'Нормально', 'Тяжело'];
 const PASSIVES = [
   { id: 'steady',  n: 'Стойкий',    t: '+20 макс. здоровья, -4 макс. энергии', req: 0 },
@@ -202,7 +213,7 @@ setMuted(muted);
 
 // ---------- мета-прогресс и достижения ----------
 const META_KEY = 'tower-meta-v1';
-const meta = { ach: {}, wins: 0, ngWins: 0, bestFloor: 0, diff: 1, sel: { p: null, a: null } };
+const meta = { ach: {}, wins: 0, ngWins: 0, bestFloor: 0, diff: 1, endings: {}, sel: { p: null, a: null } };
 try { Object.assign(meta, JSON.parse(localStorage.getItem(META_KEY)) || {}); } catch (e) {}
 const saveMeta = () => { try { localStorage.setItem(META_KEY, JSON.stringify(meta)); } catch (e) {} };
 const ACHS = [
@@ -217,6 +228,8 @@ const ACHS = [
   { id: 'cook',    n: 'Шеф',               t: 'Приготовь 5 блюд',                ok: () => S.cooked >= 5 },
   { id: 'sleep',   n: 'Крепкий сон',       t: 'Выспись в убежище 3 раза',        ok: () => S.sleeps >= 3 },
   { id: 'locked',  n: 'Взломщик',          t: 'Открой 3 запертые комнаты',       ok: () => S.opened >= 3 },
+  { id: 'quest',   n: 'Курьер',            t: 'Выполни 3 задания по телефону',   ok: () => S.quests >= 3 },
+  { id: 'end3',    n: 'Много путей',       t: 'Увидь 3 разные концовки',         ok: () => Object.keys(meta.endings || {}).length >= 3 },
   { id: 'hard',    n: 'Без поблажек',      t: 'Пройди башню на сложности «Тяжело»', ok: () => meta.hardWins >= 1 },
   { id: 'lvl5',    n: 'Закалка',           t: 'Достигни 5 уровня',               ok: () => S.lvl >= 5 },
   { id: 'lvl10',   n: 'Ветеран',           t: 'Достигни 10 уровня',              ok: () => S.lvl >= 10 },
@@ -247,7 +260,7 @@ const base = () => ({
   enemy: null, defending: false, trader: null, event: null, over: false,
   perks: [], pendingPerks: 0, perkChoices: [], notes: [], freeUsed: false,
   kills: 0, grenadeUsed: false, cycle: 0, lift: null, vend: null, repairs: 0, vendBuys: 0,
-  keys: 0, diff: 1, lockIdx: -1, opened: 0, skills: { dex: 0, str: 0, spd: 0, acc: 0 }, sp: 0, bench: 1, kitchen: 1, passive: null, active: null, activeUsed: false, freeSteps: 0, luckTurns: 0, firstStrike: false,
+  keys: 0, diff: 1, lockIdx: -1, opened: 0, quest: null, quests: 0, mercy: 0, greed: 0, skills: { dex: 0, str: 0, spd: 0, acc: 0 }, sp: 0, bench: 1, kitchen: 1, passive: null, active: null, activeUsed: false, freeSteps: 0, luckTurns: 0, firstStrike: false,
   meat: 0, herbs: 0, dish: { roast: 0, broth: 0, tea: 0, stew: 0 }, inBase: false, stunned: false, cooked: 0, sleeps: 0, mealFrom: 'map',
 });
 const has = id => S.perks.includes(id);
@@ -331,6 +344,7 @@ function newFloor() {
   });
   S.lift = { state: chance(0.15) ? 'ok' : 'broken', cost: repairCost() };
   log(`Этаж <b>${S.floor}</b>. Три двери и ${S.lift.state === 'ok' ? 'исправный лифт' : 'лифт с разбитой кабиной'}.`);
+  checkQuest();
   render(); save();
 }
 
@@ -640,8 +654,8 @@ function kickVend() {
 const EVENTS = [
   { text: 'У стены сидит раненый. Он смотрит на тебя и молчит.',
     choices: [
-      { l: 'Помочь (-1 🩹)', ok: () => S.meds > 0, run: () => { S.meds--; S.scrap += 3; gainXp(10); log('Он благодарит и делится запасами: +3🔩.', 'good'); } },
-      { l: 'Обыскать его', run: () => { S.scrap += 4; log('Ты забираешь +4🔩. Ему уже всё равно.'); } },
+      { l: 'Помочь (-1 🩹)', ok: () => S.meds > 0, run: () => { S.meds--; S.mercy++; S.scrap += 3; gainXp(10); log('Он благодарит и делится запасами: +3🔩.', 'good'); } },
+      { l: 'Обыскать его', run: () => { S.greed++; S.scrap += 4; log('Ты забираешь +4🔩. Ему уже всё равно.'); } },
       { l: 'Уйти', run: () => log('Ты проходишь мимо.') } ] },
   { text: 'Коридор впереди залит мерцающим светом. Пол трещит.',
     choices: [
@@ -665,7 +679,7 @@ const EVENTS = [
       { l: 'Сжечь книги ради тепла', run: () => { S.en = Math.min(S.maxEn, S.en + 5); log('Стало теплее. +5 энергии.'); } } ] },
   { text: 'В клетке сидит странное существо и смотрит на тебя.',
     choices: [
-      { l: 'Открыть клетку', run: () => { if (chance(0.5)) { S.scrap += 4; log('Существо убегает, оставив тебе +4🔩.', 'good'); } else { log('Оно бросается на тебя!', 'bad'); return 'fight'; } } },
+      { l: 'Открыть клетку', run: () => { S.mercy++; if (chance(0.5)) { S.scrap += 4; log('Существо убегает, оставив тебе +4🔩.', 'good'); } else { log('Оно бросается на тебя!', 'bad'); return 'fight'; } } },
       { l: 'Оставить', run: () => log('Ты уходишь.') } ] },
   { text: 'Шахта лифта без кабины. Трос уходит вверх.',
     choices: [
@@ -677,13 +691,35 @@ const EVENTS = [
       { l: 'Отказаться', run: () => log('Мастер пожимает плечами.') } ] },
   { text: 'В нише стоит каменный алтарь со свежими подношениями.',
     choices: [
-      { l: 'Принести жертву (-6 здоровья)', ok: () => S.hp > 7, run: () => { S.hp -= 6; gainXp(12); S.chem += 2; log('Что-то отвечает тебе: +12 опыта, +2🧪.', 'good'); } },
+      { l: 'Принести жертву (-6 здоровья)', ok: () => S.hp > 7, run: () => { S.hp -= 6; S.greed++; gainXp(12); S.chem += 2; log('Что-то отвечает тебе: +12 опыта, +2🧪.', 'good'); } },
       { l: 'Уйти', run: () => log('Лучше не трогать.') } ] },
   { text: 'Заброшенная аптека. Решётка заперта.',
     choices: [
       { l: 'Выломать (-3 энергии)', run: () => { spendEnergy(3); if (chance(0.7)) { S.medkit += 2; log('Внутри 2 аптечки!', 'good'); } else { S.hp -= 5; log('Решётка падает на тебя: -5 здоровья.', 'bad'); } } },
       { l: 'Пройти мимо', run: () => log('Ты оставляешь аптеку.') } ] },
+  { text: 'В тёмной комнате звонит телефон. Тихий голос просит прийти на один из этажей выше: «Пока не поздно».',
+    choices: [
+      { l: 'Ответить и пообещать прийти', ok: () => !S.quest && S.floor < TOP - 6, run: () => startQuest() },
+      { l: 'Положить трубку', run: () => log('Ты кладёшь трубку. Телефон замолкает.') } ] },
 ];
+
+function startQuest() {
+  const target = S.floor + rnd(3, 6);
+  S.quest = { floor: target, xp: 20 + S.floor, scrap: 4 + Math.floor(S.floor / 5), kit: chance(0.5) ? 1 : 0 };
+  log(`Голос: «Я буду ждать на этаже ${target}. Приходи». Связь обрывается.`, 'story');
+}
+function checkQuest() {
+  const q = S.quest;
+  if (!q) return;
+  if (S.floor === q.floor) {
+    S.quest = null; S.quests++; S.mercy++;
+    S.scrap += q.scrap; S.medkit += q.kit;
+    log(`📞 Ты приходишь вовремя. Тебя ждали: +${q.xp} опыта, +${q.scrap}🔩${q.kit ? ', 💉' : ''}.`, 'good');
+    gainXp(q.xp);
+  } else if (S.floor > q.floor) {
+    S.quest = null; log('Ты опоздал: на нужном этаже телефон давно молчит.', 'bad');
+  }
+}
 
 function startEvent() {
   const ev = pick(EVENTS);
@@ -857,6 +893,19 @@ function pickPerk(id) {
 }
 
 // ---------- конец игры ----------
+const ENDINGS = {
+  scribe: { n: 'Летописец', t: 'Ты кладёшь все найденные записки в одну папку и оставляешь на крыше. Кто-нибудь однажды прочтёт и поймёт, что здесь было.' },
+  light:  { n: 'Свет',      t: 'На крыше тебя ждут те, кому ты помог. Вместе вы зажигаете сигнальный огонь, и он виден далеко за городом.' },
+  shadow: { n: 'Тень',      t: 'Ты стоишь на крыше один, зато с полным рюкзаком. Небо большое и пустое. Кажется, ты получил ровно то, за чем шёл.' },
+  lone:   { n: 'Одиночка',  t: 'Ты просто сел на краю крыши и смотрел на рассвет. Дальше можно придумать что угодно.' },
+};
+function pickEnding() {
+  let id = 'lone';
+  if (S.notes.length >= NOTES.length) id = 'scribe';
+  else if (S.mercy >= S.greed + 2) id = 'light';
+  else if (S.greed >= S.mercy + 2) id = 'shadow';
+  return Object.assign({ id }, ENDINGS[id]);
+}
 function checkDeath() {
   if (S.hp > 0) return false;
   S.hp = 0; S.over = true; S.screen = 'dead'; sfx('death'); vib([100, 60, 200]);
@@ -868,7 +917,9 @@ function checkDeath() {
 function win() {
   S.over = true; S.screen = 'win'; best = TOP; meta.bestFloor = TOP;
   meta.wins++; if (S.cycle >= 1) meta.ngWins++; if (S.diff === 2) meta.hardWins = (meta.hardWins || 0) + 1; saveMeta(); sfx('win'); vib([60, 40, 60, 40, 200]);
+  const end = pickEnding(); meta.endings[end.id] = true; saveMeta();
   log('<b>Сотый этаж. Ты выходишь на крышу и впервые за долгое время видишь небо.</b>', 'good');
+  log(`Концовка «${end.n}» (${Object.keys(meta.endings).length}/4): ${end.t}`, 'story');
   render(); save();
 }
 
@@ -914,6 +965,7 @@ function render() {
         S.perkChoices.forEach(id => { const p = PERKS.find(x => x.id === id); a.appendChild(btn(`${p.n} — ${p.t}`, () => pickPerk(id), 'full primary')); });
         break;
       }
+      if (S.quest) head(a, `📞 Задание: дойти до этажа ${S.quest.floor} (осталось ${S.quest.floor - S.floor})`);
       S.rooms.forEach((r, i) => {
         const label = r.done ? `✔ ${roomName(r.type)}` : r.known ? `🚪 Дверь ${i + 1}: ${roomName(r.type)} (рентген)` : `🚪 Дверь ${i + 1}: ${r.hint}`;
         a.appendChild(btn(label, () => openRoom(i), 'full' + (r.done ? '' : ' primary'), r.done));
@@ -943,7 +995,12 @@ function render() {
       ACTIVES.forEach(p => a.appendChild(unlockedAt(p.req)
         ? btn(`${meta.sel.a === p.id ? '✔ ' : ''}${p.n} — ${p.t}`, () => toggleSel('a', p.id), 'full' + (meta.sel.a === p.id ? ' primary' : ''))
         : btn(`🔒 ${p.n} — откроется на этаже ${p.req}`, () => {}, 'full', true)));
+      a.appendChild(btn('❓ Как играть', () => { S.screen = 'help'; render(); }, 'full'));
       a.appendChild(btn('▶ Начать забег', startRun, 'full primary'));
+      break;
+    case 'help':
+      HELP.forEach(t => { const d = document.createElement('div'); d.className = 'head'; d.style.color = 'var(--text)'; d.textContent = t; a.appendChild(d); });
+      a.appendChild(btn('← Назад', () => { S.screen = 'start'; render(); }, 'full'));
       break;
     case 'skills':
       head(a, `Очки навыков: ${S.sp}. Оружие «${weapon().n}» усиливается навыком «${SK[WEAPON_SKILL[S.wi]]}».`);
