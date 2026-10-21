@@ -1,0 +1,15 @@
+{
+  "name": "tower-game",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Башня — пошаговая игра на выживание",
+  "scripts": {
+    "sync": "cap sync android",
+    "apk": "cap sync android && cd android && ./gradlew assembleDebug"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/cli": "^8.5.3",
+    "@capacitor/core": "^8.5.3"
+  }
+}

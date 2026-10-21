@@ -1,0 +1,6 @@
+{
+  "appId": "com.example.tower",
+  "appName": "Башня",
+  "webDir": "www",
+  "android": { "allowMixedContent": false }
+}

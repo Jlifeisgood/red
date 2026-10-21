@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Башня</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <div class="panel" id="hud">
+    <div id="top"><span id="floor"></span><span id="zone"></span></div>
+    <div class="bars">
+      <div class="bar"><span>Здоровье</span><div class="track"><div class="fill" id="b-hp" style="background:var(--hp)"></div></div><span id="t-hp"></span></div>
+      <div class="bar"><span>Энергия</span><div class="track"><div class="fill" id="b-en" style="background:var(--en)"></div></div><span id="t-en"></span></div>
+      <div class="bar"><span id="lvl"></span><div class="track"><div class="fill" id="b-xp" style="background:var(--accent)"></div></div><span id="t-xp"></span></div>
+    </div>
+    <div id="inv"></div>
+  </div>
+  <div id="log" class="panel"></div>
+  <div id="actions"></div>
+</div>
+<script src="game.js"></script>
+</body>
+</html>

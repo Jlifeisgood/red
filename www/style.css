@@ -1,0 +1,25 @@
+:root { --bg:#0e1116; --panel:#171c24; --line:#2a3240; --text:#d7dde8; --dim:#8893a5;
+        --hp:#d9534f; --en:#e6b422; --accent:#4aa3ff; --good:#5cb85c; }
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; }
+html,body { margin:0; height:100%; background:var(--bg); color:var(--text); font:16px/1.4 system-ui,sans-serif; overscroll-behavior:none; }
+#app { max-width:520px; margin:0 auto; height:100%; display:flex; flex-direction:column; gap:8px;
+       padding:max(10px,env(safe-area-inset-top)) 10px max(10px,env(safe-area-inset-bottom)); }
+.panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px; }
+#top { display:flex; justify-content:space-between; align-items:baseline; }
+#floor { font-weight:700; font-size:18px; }
+#zone { color:var(--dim); font-size:13px; }
+.bars { display:grid; gap:5px; margin-top:8px; }
+.bar { display:grid; grid-template-columns:78px 1fr 56px; align-items:center; gap:8px; font-size:12px; color:var(--dim); }
+.track { height:9px; background:#0b0e13; border-radius:5px; overflow:hidden; }
+.fill { height:100%; transition:width .25s; }
+#inv { display:flex; gap:12px; font-size:13px; margin-top:8px; flex-wrap:wrap; }
+#log { flex:1; overflow-y:auto; font-size:15px; min-height:90px; user-select:text; }
+#log p { margin:0 0 6px; } #log p.old { color:var(--dim); }
+#log p.bad { color:var(--hp); } #log p.good { color:var(--good); } #log p.story { color:var(--accent); font-style:italic; }
+#actions { display:grid; grid-template-columns:1fr 1fr; gap:7px; max-height:46vh; overflow-y:auto; }
+button { background:#1f2733; color:var(--text); border:1px solid var(--line); border-radius:10px; padding:12px 6px; font-size:14px; cursor:pointer; }
+button:active { background:#2a3546; } button:disabled { opacity:.4; }
+button.primary { border-color:var(--accent); } button.danger { border-color:var(--hp); }
+button.full, .full { grid-column:1/-1; }
+.head { grid-column:1/-1; color:var(--dim); font-size:13px; padding:2px 4px; }
+.enemy { color:var(--hp); font-weight:600; }
