@@ -77,6 +77,37 @@ const ARMORS = [
   { n: 'Экзоскелет', a: 6, c: { scrap: 18, chem: 8, cloth: 6 } },
   { n: 'Нанопластины', a: 8, c: { scrap: 26, chem: 14, cloth: 10 } },
 ];
+const SK = { dex: 'Ловкость', str: 'Сила', spd: 'Скорость', acc: 'Точность' };
+const SK_INFO = { dex: 'уворот +1.5% за очко', str: 'шанс крита +1.5% за очко', spd: 'шанс лишнего хода +1.5% за очко', acc: 'шанс попадания +2% за очко' };
+// у каждого оружия свой навык: за очки в нём оружие бьёт сильнее (+1 урона за 2 очка)
+const WEAPON_SKILL = ['spd', 'str', 'str', 'dex', 'spd', 'dex', 'acc'];
+// какой уровень верстака нужен, чтобы создать оружие/броню с этим номером
+const WEAPON_BENCH = [0, 1, 1, 2, 2, 3, 3];
+const ARMOR_BENCH = [0, 1, 1, 2, 3, 3];
+const BENCH_UP = [null, null, { scrap: 20, cloth: 6, chem: 4 }, { scrap: 45, cloth: 12, chem: 12 }];
+const KITCHEN_UP = [null, null, { scrap: 12, cloth: 4 }, { scrap: 30, chem: 6, cloth: 8 }];
+const DISH_LEVEL = { tea: 1, stew: 1, roast: 2, broth: 3 };
+// прицельные удары: шанс попадания, множитель урона и эффект
+const PARTS = {
+  head: { n: 'Голова', hit: 0.55, m: 1.8 },
+  body: { n: 'Корпус', hit: 0.85, m: 1.0 },
+  arms: { n: 'Руки',   hit: 0.75, m: 0.8, eff: 'weak' },
+  legs: { n: 'Ноги',   hit: 0.80, m: 0.8, eff: 'stag' },
+};
+const PASSIVES = [
+  { id: 'steady',  n: 'Стойкий',    t: '+20 макс. здоровья, -4 макс. энергии', req: 0 },
+  { id: 'first',   n: 'Опережение', t: 'Первый удар в бою: ×1.3 урона и не промахивается', req: 0 },
+  { id: 'glutton', n: 'Обжора',     t: 'Еда даёт +50% энергии, но яд длится на 2 хода дольше', req: 10 },
+  { id: 'rush',    n: 'Напролом',   t: '+15% урона, но убежать из боя нельзя', req: 25 },
+  { id: 'hoarder', n: 'Старатель',  t: '+2 лома со склада, но ловушки бьют на 50% сильнее', req: 40 },
+];
+const ACTIVES = [
+  { id: 'kit',   n: 'Аптечка',         t: 'Раз за забег: +50% здоровья', req: 0 },
+  { id: 'hard',  n: 'Второе дыхание',  t: 'Раз за забег: следующие 10 шагов бесплатны', req: 0 },
+  { id: 'luck',  n: 'Удача',           t: 'Раз за забег: +15% к попаданию на 15 ударов', req: 15 },
+  { id: 'xray',  n: 'Рентген',         t: 'Раз за забег: узнать, что за дверями этажа', req: 30 },
+  { id: 'stock', n: 'Запас',           t: 'Раз за забег: +6🔩 +3🧵 +3🧪', req: 50 },
+];
 const RECIPES = {
   meds:    { n: 'Бинт',         c: { cloth: 2 } },
   medkit:  { n: 'Аптечка',      c: { cloth: 2, chem: 3 } },
@@ -169,7 +200,7 @@ setMuted(muted);
 
 // ---------- мета-прогресс и достижения ----------
 const META_KEY = 'tower-meta-v1';
-const meta = { ach: {}, wins: 0, ngWins: 0 };
+const meta = { ach: {}, wins: 0, ngWins: 0, bestFloor: 0, sel: { p: null, a: null } };
 try { Object.assign(meta, JSON.parse(localStorage.getItem(META_KEY)) || {}); } catch (e) {}
 const saveMeta = () => { try { localStorage.setItem(META_KEY, JSON.stringify(meta)); } catch (e) {} };
 const ACHS = [
@@ -212,6 +243,7 @@ const base = () => ({
   enemy: null, defending: false, trader: null, event: null, over: false,
   perks: [], pendingPerks: 0, perkChoices: [], notes: [], freeUsed: false,
   kills: 0, grenadeUsed: false, cycle: 0, lift: null, vend: null, repairs: 0, vendBuys: 0,
+  skills: { dex: 0, str: 0, spd: 0, acc: 0 }, sp: 0, bench: 1, kitchen: 1, passive: null, active: null, activeUsed: false, freeSteps: 0, luckTurns: 0, firstStrike: false,
   meat: 0, herbs: 0, dish: { roast: 0, broth: 0, tea: 0, stew: 0 }, inBase: false, stunned: false, cooked: 0, sleeps: 0, mealFrom: 'map',
 });
 const has = id => S.perks.includes(id);
@@ -220,7 +252,9 @@ function newGamePlus() {
   const p = S, c = p.cycle + 1;
   S = base();
   Object.assign(S, { cycle: c, lvl: p.lvl, xp: p.xp, maxHp: p.maxHp, maxEn: p.maxEn, perks: p.perks.slice(),
-                     wi: p.wi, ai: p.ai, bonusDmg: p.bonusDmg, notes: p.notes.slice() });
+                     wi: p.wi, ai: p.ai, bonusDmg: p.bonusDmg, notes: p.notes.slice(),
+                     skills: Object.assign({}, p.skills), sp: p.sp, bench: p.bench, kitchen: p.kitchen,
+                     passive: p.passive, active: p.active });
   S.hp = S.maxHp; S.en = S.maxEn;
   $('log').innerHTML = '';
   log(`Крыша оказалась окном. За ним снова лестница вниз, и башня стала другой. <b>Круг ${c + 1}</b>: враги крепче и бьют сильнее.`, 'story');
@@ -229,9 +263,24 @@ function newGamePlus() {
 
 function newGame() {
   S = base();
+  S.screen = 'start';
+  $('log').innerHTML = '';
+  log('Новая игра. Выбери стартовые перки — открытые ты получаешь за пройденные этажи — и начинай.', 'story');
+  render();
+}
+const unlockedAt = req => (meta.bestFloor || 0) >= req;
+function toggleSel(kind, id) { meta.sel[kind] = meta.sel[kind] === id ? null : id; saveMeta(); render(); }
+function startRun() {
+  if (S.screen !== 'start') return;
+  const okP = PASSIVES.find(p => p.id === meta.sel.p && unlockedAt(p.req));
+  const okA = ACTIVES.find(p => p.id === meta.sel.a && unlockedAt(p.req));
+  S.passive = okP ? okP.id : null; S.active = okA ? okA.id : null; S.activeUsed = false;
+  if (S.passive === 'steady') { S.maxHp += 20; S.hp += 20; S.maxEn -= 4; S.en -= 4; }
   $('log').innerHTML = '';
   log('Ты приходишь в себя у подножия башни. Лифты сломаны, но их можно починить. Единственный путь — вверх, этаж за этажом.', 'story');
   log(ZONES[0].intro, 'story');
+  if (okP) log(`Пассивный перк: <b>${okP.n}</b>.`);
+  if (okA) log(`Активный перк: <b>${okA.n}</b> (один раз за забег).`);
   newFloor();
 }
 
@@ -286,7 +335,7 @@ function openRoom(i) {
   switch (r.type) {
     case 'loot': {
       r.done = true;
-      const s = rnd(1, 3) + Math.floor(S.floor / 12) + (has('scav') ? 1 : 0);
+      const s = rnd(1, 3) + Math.floor(S.floor / 12) + (has('scav') ? 1 : 0) + (S.passive === 'hoarder' ? 2 : 0);
       S.scrap += s; let msg = `${s}🔩`;
       if (chance(0.5)) { const c = rnd(1, 2); S.cloth += c; msg += `, ${c}🧵`; }
       if (chance(0.3)) { const c = rnd(1, 2); S.chem += c; msg += `, ${c}🧪`; }
@@ -307,7 +356,8 @@ function openRoom(i) {
     }
     case 'trap': {
       r.done = true;
-      const dmg = Math.max(1, rnd(2, 5) + Math.floor(S.floor / 6) - Math.floor(defArmor() / 2));
+      let dmg = Math.max(1, rnd(2, 5) + Math.floor(S.floor / 6) - Math.floor(defArmor() / 2));
+      if (S.passive === 'hoarder') dmg = Math.round(dmg * 1.5);
       S.hp -= dmg; log(`Ловушка! Теряешь ${dmg} здоровья.`, 'bad'); sfx('hurt'); vib(60);
       if (checkDeath()) return; break;
     }
@@ -327,6 +377,7 @@ function ascend() {
   if (S.floor >= TOP) return win();
   sfx('stairs');
   S.floor++; best = Math.max(best, S.floor);
+  meta.bestFloor = Math.max(meta.bestFloor || 0, S.floor); saveMeta();
   if ((S.floor - 1) % 20 === 0) log(ZONES[zoneOf(S.floor)].intro, 'story');
   newFloor();
 }
@@ -358,6 +409,7 @@ const armor = () => ARMORS[S.ai];
 const defArmor = () => armor().a + (has('thick') ? 1 : 0);
 
 function spendEnergy(n) {
+  if (S.freeSteps > 0) { S.freeSteps--; return true; }
   S.en -= n;
   if (S.en < 0) {
     S.en = 0; S.hp -= 2;
@@ -371,7 +423,7 @@ function useItem(kind) {
   if (S[kind] <= 0) return;
   if (kind === 'food') {
     if (S.en >= S.maxEn) return;
-    const g = has('stomach') ? 12 : 8; S.food--; S.en = Math.min(S.maxEn, S.en + g); log(`Ты ешь. +${g} энергии.`, 'good');
+    const g = Math.round((has('stomach') ? 12 : 8) * (S.passive === 'glutton' ? 1.5 : 1)); S.food--; S.en = Math.min(S.maxEn, S.en + g); log(`Ты ешь. +${g} энергии.`, 'good');
   } else if (kind === 'meds') {
     if (S.hp >= S.maxHp) return;
     const h = Math.max(10, Math.round(S.maxHp * 0.15)); S.meds--; S.hp = Math.min(S.maxHp, S.hp + h); log(`Бинт наложен. +${h} здоровья.`, 'good');
@@ -392,6 +444,8 @@ function craft(kind, idx) {
   else if (kind === 'armor') { item = ARMORS[idx]; c = item.c; }
   else { item = RECIPES[idx]; c = item.c; }
   if (!canPay(c)) return;
+  if (kind === 'weapon' && S.bench < WEAPON_BENCH[idx]) return;
+  if (kind === 'armor' && S.bench < ARMOR_BENCH[idx]) return;
   pay(c);
   if (kind === 'weapon') { S.wi = idx; log(`Создано: ${item.n} (урон +${item.d}).`, 'good'); }
   else if (kind === 'armor') { S.ai = idx; log(`Создано: ${item.n} (защита ${item.a}).`, 'good'); }
@@ -453,9 +507,41 @@ function sleep() {
 }
 function cook(id) {
   const d = DISHES[id];
-  if (S.screen !== 'kitchen' || !canPay(d.c)) return;
+  if (S.screen !== 'kitchen' || S.kitchen < DISH_LEVEL[id] || !canPay(d.c)) return;
   pay(d.c); S.dish[id]++; S.cooked++;
   log(`Готово: ${d.n}.`, 'good'); sfx('pickup'); render(); save();
+}
+function upgrade(what) {
+  if (S.screen !== 'base') return;
+  const lvl = what === 'bench' ? S.bench : S.kitchen;
+  const c = (what === 'bench' ? BENCH_UP : KITCHEN_UP)[lvl + 1];
+  if (!c || !canPay(c)) return;
+  pay(c);
+  if (what === 'bench') S.bench++; else S.kitchen++;
+  log(`${what === 'bench' ? 'Верстак' : 'Кухня'} улучшен${what === 'bench' ? '' : 'а'} до ур. ${lvl + 1}.`, 'good');
+  sfx('levelup'); render(); save();
+}
+function spendSkill(k) {
+  if (S.sp <= 0 || S.screen !== 'skills') return;
+  S.sp--; S.skills[k]++; sfx('pickup'); render(); save();
+}
+function useActive() {
+  if (!S.active || S.activeUsed) return;
+  const id = S.active;
+  if (id === 'xray') {
+    if (S.screen !== 'map') { log('Рентген работает только на этаже.'); return; }
+    S.rooms.forEach(r => { r.known = true; }); log('Рентген: ты видишь, что скрывается за дверями.', 'good');
+  } else if (id === 'hard') {
+    S.freeSteps = 10; log('Второе дыхание: следующие 10 шагов не тратят энергию.', 'good');
+  } else if (id === 'luck') {
+    S.luckTurns = 15; log('Удача на твоей стороне: +15% к попаданию на 15 ударов.', 'good');
+  } else if (id === 'stock') {
+    S.scrap += 6; S.cloth += 3; S.chem += 3; log('Из тайника: +6🔩, +3🧵, +3🧪.', 'good');
+  } else if (id === 'kit') {
+    const h = Math.round(S.maxHp * 0.5); S.hp = Math.min(S.maxHp, S.hp + h); log(`Аптечка из рюкзака: +${h} здоровья.`, 'good');
+  }
+  S.activeUsed = true; sfx('levelup');
+  if (S.screen === 'fight' && id === 'kit') enemyTurn(); else { render(); save(); }
 }
 function openMeals() { S.mealFrom = S.screen; S.screen = 'meals'; render(); }
 function eatDish(id) {
@@ -591,33 +677,52 @@ function startFight(e) {
     e.d = [Math.round(e.d[0] * (1 + 0.35 * c)), Math.round(e.d[1] * (1 + 0.35 * c))];
     e.xp = Math.round(e.xp * (1 + 0.3 * c));
   }
-  e.maxHp = e.hp; S.enemy = e; S.screen = 'fight'; S.defending = false; S.freeUsed = false;
+  e.maxHp = e.hp; S.enemy = e; S.screen = 'fight'; S.defending = false; S.freeUsed = false; S.firstStrike = true;
   log(`Перед тобой <span class="enemy">${e.n}</span> (${e.hp} HP)${traitText(e)}!`);
   render(); save();
 }
+const skillDmg = () => Math.floor(S.skills[WEAPON_SKILL[S.wi]] * 0.5);
+const atkBase = () => weapon().d + 1 + Math.floor(S.lvl / 2) + S.bonusDmg + skillDmg();
+const atkMult = () => S.passive === 'rush' ? 1.15 : 1;
 function playerDamage(mult = 1) {
-  let d = Math.round((rnd(2, 4) + weapon().d + S.lvl + S.bonusDmg) * mult);
+  let d = Math.round((rnd(2, 4) + atkBase()) * mult * atkMult());
   if (S.enemy.armored) d = Math.max(1, d - Math.max(2, Math.round(d * 0.15)));
   return d;
 }
-function attack(heavy) {
+function hitChance(part) {
+  const p = PARTS[part].hit + S.skills.acc * 0.02 + (S.luckTurns > 0 ? 0.15 : 0) - (S.enemy.dodge ? 0.15 : 0);
+  return Math.max(0.05, Math.min(0.95, p));
+}
+function dmgRange(part) {
+  const m = PARTS[part].m * atkMult();
+  return [Math.round((2 + atkBase()) * m), Math.round((4 + atkBase()) * m)];
+}
+function attack(part) {
   if (S.stunned) { S.stunned = false; S.defending = false; log('Ты оглушён и теряешь ход.', 'bad'); return enemyTurn(); }
-  if (heavy) { if (S.en < 2) return; S.en -= 2; }
-  const hit = (heavy ? 0.7 : 0.9) - (S.enemy.dodge ? 0.15 : 0);
-  if (!chance(hit)) log('Ты промахиваешься.');
+  if (part === true) part = 'head';
+  if (!PARTS[part]) part = 'body';
+  const P = PARTS[part], e = S.enemy;
+  const sure = S.firstStrike && S.passive === 'first';
+  S.firstStrike = false;
+  const p = hitChance(part);
+  if (S.luckTurns > 0) S.luckTurns--;
+  if (!sure && !chance(p)) log(`Ты промахиваешься (${P.n.toLowerCase()}).`);
   else {
-    let d = playerDamage(heavy ? 1.8 : 1);
-    const crit = has('crit') && chance(0.15);
+    let d = playerDamage(P.m * (sure ? 1.3 : 1));
+    const crit = chance((has('crit') ? 0.15 : 0) + S.skills.str * 0.015);
     if (crit) d *= 2;
-    S.enemy.hp -= d; log(`${crit ? 'Критический удар! ' : ''}Ты бьёшь: <b>${d}</b> урона.`);
+    e.hp -= d; log(`${crit ? 'Критический удар! ' : ''}${P.n}: <b>${d}</b> урона.`);
     sfx(crit ? 'crit' : 'hit'); if (crit) vib(60);
-    if (S.enemy.thorns) {
+    if (P.eff === 'weak' && e.hp > 0) { e.weak = 3; log('Враг ослаблен: его удары слабее.'); }
+    if (P.eff === 'stag' && e.hp > 0) { e.stag = 2; log('Враг шатается и может пропустить ход.'); }
+    if (e.thorns) {
       const t = 2 + Math.floor(S.floor / 20);
       S.hp -= t; log(`Шипы ранят тебя: -${t}.`, 'bad');
       if (checkDeath()) return;
     }
   }
-  if (S.enemy.hp <= 0) return victory();
+  if (e.hp <= 0) return victory();
+  if (chance(Math.min(0.3, S.skills.spd * 0.015))) { log('Ты успеваешь ударить снова!', 'good'); render(); save(); return; }
   S.defending = false; enemyTurn();
 }
 function throwGrenade() {
@@ -628,6 +733,7 @@ function throwGrenade() {
 }
 function defend() { S.defending = true; log('Ты прикрываешься.'); enemyTurn(); }
 function flee() {
+  if (S.passive === 'rush') { log('Ты не отступаешь!', 'bad'); return enemyTurn(); }
   if (chance(0.5)) {
     log('Ты удираешь.', 'good');
     S.enemy = null; S.screen = S.inBase ? 'base' : 'map'; S.defending = false;
@@ -641,20 +747,29 @@ function enemyTurn() {
     const h = Math.max(1, Math.round(e.maxHp * 0.08));
     e.hp = Math.min(e.maxHp, e.hp + h); log(`${e.n} восстанавливается: +${h}.`);
   }
-  const hits = e.multi ? 2 : 1;
-  for (let i = 0; i < hits; i++) {
-    let raw = rnd(e.d[0], e.d[1]);
-    if (e.enrage && e.hp < e.maxHp * 0.5) raw = Math.round(raw * 1.3);
-    if (hits > 1) raw = Math.max(1, Math.round(raw * 0.6));
-    let dmg = Math.max(1, raw - defArmor());
-    if (S.defending) dmg = Math.ceil(dmg / 2);
-    S.hp -= dmg;
-    log(`<span class="enemy">${e.n}</span> наносит <b>${dmg}</b> урона.`, 'bad');
+  const skipTurn = e.stag > 0 && (e.stag--, chance(0.5));
+  if (skipTurn) log(`${e.n} теряет равновесие и пропускает ход.`, 'good');
+  else {
+    const hits = e.multi ? 2 : 1;
+    const dodgeP = Math.min(0.3, S.skills.dex * 0.015);
+    let landed = false;
+    for (let i = 0; i < hits; i++) {
+      if (chance(dodgeP)) { log('Ты уворачиваешься от удара!', 'good'); continue; }
+      let raw = rnd(e.d[0], e.d[1]);
+      if (e.enrage && e.hp < e.maxHp * 0.5) raw = Math.round(raw * 1.3);
+      if (e.weak > 0) raw = Math.round(raw * 0.7);
+      if (hits > 1) raw = Math.max(1, Math.round(raw * 0.6));
+      let dmg = Math.max(1, raw - defArmor());
+      if (S.defending) dmg = Math.ceil(dmg / 2);
+      S.hp -= dmg; landed = true;
+      log(`<span class="enemy">${e.n}</span> наносит <b>${dmg}</b> урона.`, 'bad');
+    }
+    if (e.weak > 0) e.weak--;
+    if (landed) { sfx('hurt'); vib(40); }
+    if (landed && e.poison && !S.defending && chance(0.35) && !S.poison) { S.poison = 3 + (S.passive === 'glutton' ? 2 : 0); log('Ты отравлен!', 'bad'); }
+    if (landed && e.stun && !S.defending && chance(0.2)) { S.stunned = true; log('Удар оглушил тебя: следующая атака пропадёт!', 'bad'); }
+    if (landed && e.drain && chance(0.5)) { S.en = Math.max(0, S.en - 2); log('Враг вытягивает силы: -2 энергии.', 'bad'); }
   }
-  sfx('hurt'); vib(40);
-  if (e.poison && !S.defending && chance(0.35) && !S.poison) { S.poison = 3; log('Ты отравлен!', 'bad'); }
-  if (e.stun && !S.defending && chance(0.2)) { S.stunned = true; log('Удар оглушил тебя: следующая атака пропадёт!', 'bad'); }
-  if (e.drain && chance(0.5)) { S.en = Math.max(0, S.en - 2); log('Враг вытягивает силы: -2 энергии.', 'bad'); }
   S.defending = false;
   if (S.poison > 0) { const pd = has('stomach') ? 1 : 2; S.poison--; S.hp -= pd; log(`Яд: -${pd} здоровья.`, 'bad'); }
   if (checkDeath()) return;
@@ -680,8 +795,8 @@ function gainXp(n) {
   while (S.xp >= S.lvl * 20) {
     S.xp -= S.lvl * 20; S.lvl++;
     S.maxHp += 6; S.maxEn += 2; S.hp = Math.min(S.maxHp, S.hp + 10);
-    log(`Уровень <b>${S.lvl}</b>! Макс. здоровье +6, энергия +2, урон +1.`, 'good');
-    S.pendingPerks++; sfx('levelup'); vib(30);
+    log(`Уровень <b>${S.lvl}</b>! Макс. здоровье +6, энергия +2, +2 очка навыков (кнопка ⭐ Навыки).`, 'good');
+    S.pendingPerks++; S.sp += 2; sfx('levelup'); vib(30);
   }
 }
 
@@ -703,11 +818,12 @@ function checkDeath() {
   if (S.hp > 0) return false;
   S.hp = 0; S.over = true; S.screen = 'dead'; sfx('death'); vib([100, 60, 200]);
   best = Math.max(best, S.floor);
+  meta.bestFloor = Math.max(meta.bestFloor || 0, S.floor); saveMeta();
   log(`Ты погиб на этаже ${S.floor}.`, 'bad');
   render(); save(); return true;
 }
 function win() {
-  S.over = true; S.screen = 'win'; best = TOP;
+  S.over = true; S.screen = 'win'; best = TOP; meta.bestFloor = TOP;
   meta.wins++; if (S.cycle >= 1) meta.ngWins++; saveMeta(); sfx('win'); vib([60, 40, 60, 40, 200]);
   log('<b>Сотый этаж. Ты выходишь на крышу и впервые за долгое время видишь небо.</b>', 'good');
   render(); save();
@@ -727,6 +843,8 @@ function consumableButtons(a) {
   a.appendChild(btn(`Аптечка 💉${S.medkit}`, () => useItem('medkit'), '', S.medkit <= 0 || (S.hp >= S.maxHp && !S.poison)));
   a.appendChild(btn(`Стим ⚡${S.stim}`, () => useItem('stim'), '', S.stim <= 0 || S.en >= S.maxEn));
   a.appendChild(btn(`🍲 Блюда ${totalDishes()}`, openMeals, 'full', totalDishes() === 0));
+  const ap = ACTIVES.find(x => x.id === S.active);
+  if (ap) a.appendChild(btn(S.activeUsed ? `✨ ${ap.n} (использовано)` : `✨ ${ap.n}: ${ap.t.replace('Раз за забег: ', '')}`, useActive, 'full', S.activeUsed));
 }
 
 function render() {
@@ -754,7 +872,7 @@ function render() {
         break;
       }
       S.rooms.forEach((r, i) => {
-        const label = r.done ? `✔ ${roomName(r.type)}` : `🚪 Дверь ${i + 1}: ${r.hint}`;
+        const label = r.done ? `✔ ${roomName(r.type)}` : r.known ? `🚪 Дверь ${i + 1}: ${roomName(r.type)} (рентген)` : `🚪 Дверь ${i + 1}: ${r.hint}`;
         a.appendChild(btn(label, () => openRoom(i), 'full' + (r.done ? '' : ' primary'), r.done));
       });
       if (S.lift) {
@@ -769,7 +887,25 @@ function render() {
       consumableButtons(a);
       a.appendChild(btn('🛠 Мастерская', () => { S.screen = 'craft'; render(); }));
       a.appendChild(btn(`📖 Дневник ${S.notes.length}/${NOTES.length}`, () => { S.screen = 'diary'; render(); }));
-      a.appendChild(btn(`🏆 Достижения ${ACHS.filter(x => meta.ach[x.id]).length}/${ACHS.length}`, () => { S.screen = 'ach'; render(); }, 'full'));
+      a.appendChild(btn(`🏆 Достижения ${ACHS.filter(x => meta.ach[x.id]).length}/${ACHS.length}`, () => { S.screen = 'ach'; render(); }));
+      a.appendChild(btn(`⭐ Навыки${S.sp ? ' (' + S.sp + ')' : ''}`, () => { S.screen = 'skills'; render(); }, S.sp ? 'primary' : ''));
+      break;
+    case 'start':
+      head(a, 'Пассивный перк (действует весь забег). Нажми ещё раз, чтобы снять:');
+      PASSIVES.forEach(p => a.appendChild(unlockedAt(p.req)
+        ? btn(`${meta.sel.p === p.id ? '✔ ' : ''}${p.n} — ${p.t}`, () => toggleSel('p', p.id), 'full' + (meta.sel.p === p.id ? ' primary' : ''))
+        : btn(`🔒 ${p.n} — откроется на этаже ${p.req}`, () => {}, 'full', true)));
+      head(a, 'Активный перк (один раз за забег):');
+      ACTIVES.forEach(p => a.appendChild(unlockedAt(p.req)
+        ? btn(`${meta.sel.a === p.id ? '✔ ' : ''}${p.n} — ${p.t}`, () => toggleSel('a', p.id), 'full' + (meta.sel.a === p.id ? ' primary' : ''))
+        : btn(`🔒 ${p.n} — откроется на этаже ${p.req}`, () => {}, 'full', true)));
+      a.appendChild(btn('▶ Начать забег', startRun, 'full primary'));
+      break;
+    case 'skills':
+      head(a, `Очки навыков: ${S.sp}. Оружие «${weapon().n}» усиливается навыком «${SK[WEAPON_SKILL[S.wi]]}».`);
+      Object.keys(SK).forEach(k => a.appendChild(btn(
+        `${WEAPON_SKILL[S.wi] === k ? '★ ' : ''}${SK[k]} ${S.skills[k]} (+1) — ${SK_INFO[k]}`, () => spendSkill(k), 'full' + (S.sp ? ' primary' : ''), S.sp <= 0)));
+      a.appendChild(btn('← Назад', () => { S.screen = S.inBase ? 'base' : 'map'; render(); }, 'full'));
       break;
     case 'ach':
       ACHS.forEach(x => {
@@ -786,17 +922,25 @@ function render() {
       if (S.perks.length) head(a, 'Перки: ' + S.perks.map(id => PERKS.find(p => p.id === id).n).join(', '));
       a.appendChild(btn('← Назад', () => { S.screen = 'map'; render(); }, 'full'));
       break;
-    case 'base':
-      head(a, `Убежище. Койка, плита, верстак. Возврат на этаж ${S.floor}: -${returnCost()} энергии.`);
+    case 'base': {
+      head(a, `Убежище. Возврат на этаж ${S.floor}: -${returnCost()} энергии.`);
       a.appendChild(btn('🛏 Спать (-6 энергии, полное здоровье)', sleep, 'full primary', S.en < 6));
-      a.appendChild(btn('🍳 Кухня', () => { S.screen = 'kitchen'; render(); }));
-      a.appendChild(btn('🛠 Мастерская', () => { S.screen = 'craft'; render(); }));
+      a.appendChild(btn(`🍳 Кухня ур.${S.kitchen}`, () => { S.screen = 'kitchen'; render(); }));
+      a.appendChild(btn(`🛠 Верстак ур.${S.bench}`, () => { S.screen = 'craft'; render(); }));
+      const bu = BENCH_UP[S.bench + 1], ku = KITCHEN_UP[S.kitchen + 1];
+      if (bu) a.appendChild(btn(`🔧 Улучшить верстак — ${costText(bu)}`, () => upgrade('bench'), 'full', !canPay(bu)));
+      if (ku) a.appendChild(btn(`🔧 Улучшить кухню — ${costText(ku)}`, () => upgrade('kitchen'), 'full', !canPay(ku)));
+      a.appendChild(btn(`⭐ Навыки${S.sp ? ' (' + S.sp + ')' : ''}`, () => { S.screen = 'skills'; render(); }, 'full' + (S.sp ? ' primary' : '')));
       consumableButtons(a);
       a.appendChild(btn(`⬆ Вернуться на этаж ${S.floor}`, returnUp, 'full primary'));
       break;
+    }
     case 'kitchen':
-      head(a, `Ингредиенты: 🥩${S.meat} 🌿${S.herbs} 🍖${S.food}. Блюд готово: ${totalDishes()}`);
-      Object.entries(DISHES).forEach(([id, d]) => a.appendChild(btn(`${d.n} — ${costText(d.c)} (${d.t}) ×${S.dish[id]}`, () => cook(id), 'full', !canPay(d.c))));
+      head(a, `Кухня ур.${S.kitchen}. Ингредиенты: 🥩${S.meat} 🌿${S.herbs} 🍖${S.food}. Блюд готово: ${totalDishes()}`);
+      Object.entries(DISHES).forEach(([id, d]) => {
+        const lock = S.kitchen < DISH_LEVEL[id];
+        a.appendChild(btn(lock ? `🔒 ${d.n}: нужна кухня ур.${DISH_LEVEL[id]}` : `${d.n} — ${costText(d.c)} (${d.t}) ×${S.dish[id]}`, () => cook(id), 'full', lock || !canPay(d.c)));
+      });
       a.appendChild(btn('← Назад', () => { S.screen = 'base'; render(); }, 'full'));
       break;
     case 'meals':
@@ -805,10 +949,16 @@ function render() {
       a.appendChild(btn('← Назад', () => { S.screen = S.mealFrom; render(); }, 'full'));
       break;
     case 'craft': {
-      head(a, `Материалы: 🔩${S.scrap} 🧵${S.cloth} 🧪${S.chem}`);
+      head(a, `Верстак ур.${S.bench}. Материалы: 🔩${S.scrap} 🧵${S.cloth} 🧪${S.chem}`);
       const nw = WEAPONS[S.wi + 1], na = ARMORS[S.ai + 1];
-      if (nw) a.appendChild(btn(`⚔️ ${nw.n} (+${nw.d}) — ${costText(nw.c)}`, () => craft('weapon', S.wi + 1), 'full', !canPay(nw.c)));
-      if (na) a.appendChild(btn(`🛡️ ${na.n} (защита ${na.a}) — ${costText(na.c)}`, () => craft('armor', S.ai + 1), 'full', !canPay(na.c)));
+      if (nw) {
+        const need = WEAPON_BENCH[S.wi + 1], lock = S.bench < need;
+        a.appendChild(btn(lock ? `🔒 ${nw.n}: нужен верстак ур.${need} (улучшается в убежище)` : `⚔️ ${nw.n} (+${nw.d}, навык «${SK[WEAPON_SKILL[S.wi + 1]]}») — ${costText(nw.c)}`, () => craft('weapon', S.wi + 1), 'full', lock || !canPay(nw.c)));
+      }
+      if (na) {
+        const need = ARMOR_BENCH[S.ai + 1], lock = S.bench < need;
+        a.appendChild(btn(lock ? `🔒 ${na.n}: нужен верстак ур.${need} (улучшается в убежище)` : `🛡️ ${na.n} (защита ${na.a}) — ${costText(na.c)}`, () => craft('armor', S.ai + 1), 'full', lock || !canPay(na.c)));
+      }
       Object.entries(RECIPES).forEach(([k, r]) => a.appendChild(btn(`${RES_ICON[k]} ${r.n} — ${costText(r.c)}`, () => craft('res', k), 'full', !canPay(r.c))));
       a.appendChild(btn('← Назад', () => { S.screen = S.inBase ? 'base' : 'map'; render(); }, 'full'));
       break;
@@ -829,11 +979,14 @@ function render() {
       break;
     case 'fight': {
       const e = S.enemy;
-      a.appendChild(btn(`${e.n} ${traitIcons(e)}: ${Math.max(0, e.hp)}/${e.maxHp} HP`, () => {}, 'full danger', true));
-      a.appendChild(btn('Атаковать', () => attack(false), 'primary'));
-      a.appendChild(btn('Мощный удар (-2 эн.)', () => attack(true), 'primary', S.en < 2));
+      a.appendChild(btn(`${e.n} ${traitIcons(e)}: ${Math.max(0, e.hp)}/${e.maxHp} HP${e.weak > 0 ? ' · ослаблен' : ''}${e.stag > 0 ? ' · шатается' : ''}`, () => {}, 'full danger', true));
+      Object.keys(PARTS).forEach(k => {
+        const r = dmgRange(k);
+        a.appendChild(btn(`${PARTS[k].n} ${Math.round(hitChance(k) * 100)}% · ${r[0]}–${r[1]}`, () => attack(k), 'primary'));
+      });
+      head(a, 'Руки: враг слабее бьёт. Ноги: враг может пропустить ход.');
       a.appendChild(btn('Защита', defend));
-      a.appendChild(btn('Бежать', flee));
+      a.appendChild(btn('Бежать', flee, '', S.passive === 'rush'));
       a.appendChild(btn(`Граната 💣${S.grenade}`, throwGrenade, 'full', S.grenade <= 0));
       consumableButtons(a);
       break;
@@ -849,4 +1002,4 @@ function roomName(t) {
 }
 
 // ---------- старт ----------
-if (load()) { if (!S.lift) newFloor(); log('Игра загружена.'); render(); } else newGame();
+if (load()) { if (!S.lift && S.screen !== 'start') newFloor(); log('Игра загружена.'); render(); } else newGame();
