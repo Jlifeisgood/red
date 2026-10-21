@@ -26,36 +26,46 @@ const ENEMIES = [
     { n: 'Бродячий пёс',     hp: 12, d: [2, 3], xp: 6,  beast: true, dodge: true },
     { n: 'Сборщик',          hp: 13, d: [2, 3], xp: 7,  poison: true },
     { n: 'Слизень',          hp: 16, d: [1, 3], xp: 7,  regen: true },
-    { n: 'Ржавый дрон',      hp: 12, d: [2, 3], xp: 8,  armored: true } ],
+    { n: 'Ржавый дрон',      hp: 12, d: [2, 3], xp: 8,  armored: true },
+    { n: 'Летучая мышь',     hp: 8,  d: [1, 2], xp: 5,  beast: true, dodge: true, bleed: true },
+    { n: 'Гигантская мокрица', hp: 15, d: [1, 3], xp: 7, beast: true, armored: true } ],
   [ // Жилые этажи
     { n: 'Одичавший сосед',  hp: 15, d: [2, 4], xp: 8,  enrage: true },
     { n: 'Кошка-мутант',     hp: 12, d: [2, 3], xp: 8,  beast: true, dodge: true, poison: true },
     { n: 'Мародёр',          hp: 14, d: [2, 4], xp: 7 },
     { n: 'Ползун',           hp: 14, d: [2, 3], xp: 8,  beast: true, poison: true },
-    { n: 'Скиталец',         hp: 16, d: [2, 4], xp: 9,  drain: true } ],
+    { n: 'Скиталец',         hp: 16, d: [2, 4], xp: 9,  drain: true },
+    { n: 'Бродячий повар',   hp: 16, d: [2, 4], xp: 9,  bleed: true },
+    { n: 'Сторожевой пёс',   hp: 15, d: [2, 4], xp: 9,  beast: true, enrage: true } ],
   [ // Офисы
     { n: 'Охранный робот',   hp: 16, d: [2, 4], xp: 9,  armored: true },
     { n: 'Дрон-наблюдатель', hp: 12, d: [2, 3], xp: 9,  drain: true, dodge: true },
     { n: 'Сотрудник',        hp: 15, d: [2, 4], xp: 9,  stun: true },
     { n: 'Турникет-страж',   hp: 18, d: [2, 3], xp: 9,  thorns: true, armored: true },
-    { n: 'Менеджер',         hp: 14, d: [3, 4], xp: 10, enrage: true } ],
+    { n: 'Менеджер',         hp: 14, d: [3, 4], xp: 10, enrage: true },
+    { n: 'Уборщик-автомат',  hp: 17, d: [2, 3], xp: 9,  armored: true, regen: true },
+    { n: 'Бухгалтер-призрак', hp: 13, d: [2, 4], xp: 10, dodge: true, stun: true } ],
   [ // Лаборатории
     { n: 'Подопытный',       hp: 18, d: [2, 4], xp: 10, beast: true, enrage: true },
     { n: 'Мутант',           hp: 18, d: [2, 4], xp: 10, beast: true, poison: true, regen: true },
     { n: 'Лаборант-культист', hp: 14, d: [2, 4], xp: 10, stun: true, poison: true },
     { n: 'Дрон-палач',       hp: 17, d: [2, 4], xp: 10, armored: true, thorns: true },
-    { n: 'Химера',           hp: 20, d: [2, 4], xp: 11, beast: true, multi: true } ],
+    { n: 'Химера',           hp: 20, d: [2, 4], xp: 11, beast: true, multi: true },
+    { n: 'Колба-слизень',    hp: 20, d: [2, 3], xp: 10, poison: true, regen: true },
+    { n: 'Скальпельщик',     hp: 15, d: [3, 4], xp: 11, bleed: true, dodge: true } ],
   [ // Пентхаус
     { n: 'Страж',            hp: 18, d: [2, 4], xp: 11, armored: true },
     { n: 'Наместник',        hp: 17, d: [3, 5], xp: 12, enrage: true, stun: true },
     { n: 'Тень',             hp: 15, d: [3, 4], xp: 12, dodge: true, drain: true },
     { n: 'Элитный дрон',     hp: 19, d: [2, 4], xp: 12, armored: true, regen: true },
-    { n: 'Королевская химера', hp: 21, d: [2, 4], xp: 13, beast: true, multi: true, poison: true } ],
+    { n: 'Королевская химера', hp: 21, d: [2, 4], xp: 13, beast: true, multi: true, poison: true },
+    { n: 'Золотая гончая',   hp: 17, d: [3, 4], xp: 12, beast: true, dodge: true, bleed: true },
+    { n: 'Метрдотель',       hp: 19, d: [2, 4], xp: 12, stun: true, enrage: true } ],
 ];
 const TRAITS = {
   armored: ['🛡', 'броня'], poison: ['☠', 'яд'], regen: ['♻', 'регенерация'], thorns: ['🌵', 'шипы'],
   drain: ['⚡', 'тянет энергию'], dodge: ['💨', 'увёртлив'], enrage: ['😡', 'свирепеет при ранах'],
-  stun: ['💫', 'оглушает'], multi: ['⚔⚔', 'два удара'],
+  stun: ['💫', 'оглушает'], multi: ['⚔⚔', 'два удара'], bleed: ['🩸', 'кровотечение'],
 };
 const traitIcons = e => Object.keys(TRAITS).filter(k => e[k]).map(k => TRAITS[k][0]).join('');
 const traitText = e => { const t = Object.keys(TRAITS).filter(k => e[k]).map(k => TRAITS[k][1]); return t.length ? ' — ' + t.join(', ') : ''; };
@@ -86,7 +96,7 @@ const WEAPON_BENCH = [0, 1, 1, 2, 2, 3, 3];
 const ARMOR_BENCH = [0, 1, 1, 2, 3, 3];
 const BENCH_UP = [null, null, { scrap: 20, cloth: 6, chem: 4 }, { scrap: 45, cloth: 12, chem: 12 }];
 const KITCHEN_UP = [null, null, { scrap: 12, cloth: 4 }, { scrap: 30, chem: 6, cloth: 8 }];
-const DISH_LEVEL = { tea: 1, stew: 1, roast: 2, broth: 3 };
+const DISH_LEVEL = { tea: 1, stew: 1, porridge: 1, bar: 1, roast: 2, soup: 2, pie: 2, antidote: 2, broth: 3, skewer: 3, feast: 3 };
 // прицельные удары: шанс попадания, множитель урона и эффект
 const PARTS = {
   head: { n: 'Голова', hit: 0.55, m: 1.8 },
@@ -126,7 +136,7 @@ const RECIPES = {
   stim:    { n: 'Стимулятор',   c: { chem: 3, scrap: 1 } },
   grenade: { n: 'Граната',      c: { chem: 2, scrap: 2 } },
 };
-const RES_ICON = { meat: '🥩', herbs: '🌿', scrap: '🔩', cloth: '🧵', chem: '🧪', food: '🍖', meds: '🩹', medkit: '💉', stim: '⚡', grenade: '💣' };
+const RES_ICON = { shrooms: '🍄', meat: '🥩', herbs: '🌿', scrap: '🔩', cloth: '🧵', chem: '🧪', food: '🍖', meds: '🩹', medkit: '💉', stim: '⚡', grenade: '💣' };
 const costText = c => Object.entries(c).map(([k, v]) => `${v}${RES_ICON[k]}`).join(' ');
 const canPay = c => Object.entries(c).every(([k, v]) => S[k] >= v);
 const pay = c => Object.entries(c).forEach(([k, v]) => S[k] -= v);
@@ -228,6 +238,7 @@ const ACHS = [
   { id: 'cook',    n: 'Шеф',               t: 'Приготовь 5 блюд',                ok: () => S.cooked >= 5 },
   { id: 'sleep',   n: 'Крепкий сон',       t: 'Выспись в убежище 3 раза',        ok: () => S.sleeps >= 3 },
   { id: 'locked',  n: 'Взломщик',          t: 'Открой 3 запертые комнаты',       ok: () => S.opened >= 3 },
+  { id: 'chef15',  n: 'Шеф-повар',         t: 'Приготовь 15 блюд за забег',      ok: () => S.cooked >= 15 },
   { id: 'quest',   n: 'Курьер',            t: 'Выполни 3 задания по телефону',   ok: () => S.quests >= 3 },
   { id: 'end3',    n: 'Много путей',       t: 'Увидь 3 разные концовки',         ok: () => Object.keys(meta.endings || {}).length >= 3 },
   { id: 'hard',    n: 'Без поблажек',      t: 'Пройди башню на сложности «Тяжело»', ok: () => meta.hardWins >= 1 },
@@ -256,12 +267,12 @@ function checkAch() {
 const base = () => ({
   floor: 1, hp: 30, maxHp: 30, en: 20, maxEn: 20, lvl: 1, xp: 0,
   scrap: 0, cloth: 0, chem: 0, food: 3, meds: 1, medkit: 0, stim: 0, grenade: 0,
-  wi: 0, ai: 0, poison: 0, bonusDmg: 0, screen: 'map', rooms: [], stairs: false,
+  wi: 0, ai: 0, poison: 0, bleed: 0, shrooms: 0, bonusDmg: 0, screen: 'map', rooms: [], stairs: false,
   enemy: null, defending: false, trader: null, event: null, over: false,
   perks: [], pendingPerks: 0, perkChoices: [], notes: [], freeUsed: false,
   kills: 0, grenadeUsed: false, cycle: 0, lift: null, vend: null, repairs: 0, vendBuys: 0,
   keys: 0, diff: 1, lockIdx: -1, opened: 0, quest: null, quests: 0, mercy: 0, greed: 0, skills: { dex: 0, str: 0, spd: 0, acc: 0 }, sp: 0, bench: 1, kitchen: 1, passive: null, active: null, activeUsed: false, freeSteps: 0, luckTurns: 0, firstStrike: false,
-  meat: 0, herbs: 0, dish: { roast: 0, broth: 0, tea: 0, stew: 0 }, inBase: false, stunned: false, cooked: 0, sleeps: 0, mealFrom: 'map',
+  meat: 0, herbs: 0, dish: { tea: 0, stew: 0, porridge: 0, bar: 0, roast: 0, soup: 0, pie: 0, antidote: 0, broth: 0, skewer: 0, feast: 0 }, inBase: false, stunned: false, cooked: 0, sleeps: 0, mealFrom: 'map',
 });
 const has = id => S.perks.includes(id);
 
@@ -307,7 +318,7 @@ function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ S, best 
 function load() {
   try {
     const d = JSON.parse(localStorage.getItem(SAVE_KEY));
-    if (d) { best = d.best || 0; if (d.S && !d.S.over) { S = Object.assign(base(), d.S); return true; } }
+    if (d) { best = d.best || 0; if (d.S && !d.S.over) { S = Object.assign(base(), d.S); S.dish = Object.assign(base().dish, d.S.dish); return true; } }
   } catch (e) {}
   return false;
 }
@@ -366,6 +377,7 @@ function openRoom(i) {
       if (chance(0.3)) { const c = rnd(1, 2); S.chem += c; msg += `, ${c}🧪`; }
       if (chance(0.45)) { S.food++; msg += ', 🍖'; }
       if (chance(0.4)) { const h = rnd(1, 2); S.herbs += h; msg += `, ${h}🌿`; }
+      if (chance(0.25)) { const m = rnd(1, 2); S.shrooms += m; msg += `, ${m}🍄`; }
       if (chance(0.15)) { S.meds++; msg += ', 🩹'; }
       if (chance(0.15)) { S.keys++; msg += ', 🔑'; }
       if (chance(0.2)) {
@@ -377,7 +389,7 @@ function openRoom(i) {
     case 'rest': {
       r.done = true;
       const h = Math.max(8, Math.round(S.maxHp * 0.3));
-      S.hp = Math.min(S.maxHp, S.hp + h); S.en = Math.min(S.maxEn, S.en + 6); S.poison = 0;
+      S.hp = Math.min(S.maxHp, S.hp + h); S.en = Math.min(S.maxEn, S.en + 6); S.poison = 0; S.bleed = 0;
       log(`Кто-то оставил здесь койку и чайник. Ты отдыхаешь: +${h} здоровья, +6 энергии.`, 'good'); break;
     }
     case 'trap': {
@@ -477,11 +489,11 @@ function useItem(kind) {
     if (S.en >= S.maxEn) return;
     const g = Math.round((has('stomach') ? 12 : 8) * (S.passive === 'glutton' ? 1.5 : 1)); S.food--; S.en = Math.min(S.maxEn, S.en + g); log(`Ты ешь. +${g} энергии.`, 'good');
   } else if (kind === 'meds') {
-    if (S.hp >= S.maxHp) return;
-    const h = Math.max(10, Math.round(S.maxHp * 0.15)); S.meds--; S.hp = Math.min(S.maxHp, S.hp + h); log(`Бинт наложен. +${h} здоровья.`, 'good');
+    if (S.hp >= S.maxHp && !S.bleed) return;
+    const h = Math.max(10, Math.round(S.maxHp * 0.15)); S.bleed = 0; S.meds--; S.hp = Math.min(S.maxHp, S.hp + h); log(`Бинт наложен. +${h} здоровья.`, 'good');
   } else if (kind === 'medkit') {
-    if (S.hp >= S.maxHp && !S.poison) return;
-    const h = Math.max(25, Math.round(S.maxHp * 0.35)); S.medkit--; S.hp = Math.min(S.maxHp, S.hp + h); S.poison = 0;
+    if (S.hp >= S.maxHp && !S.poison && !S.bleed) return;
+    const h = Math.max(25, Math.round(S.maxHp * 0.35)); S.medkit--; S.hp = Math.min(S.maxHp, S.hp + h); S.poison = 0; S.bleed = 0;
     log(`Аптечка: +${h} здоровья, яд нейтрализован.`, 'good');
   } else if (kind === 'stim') {
     if (S.en >= S.maxEn) return;
@@ -525,10 +537,17 @@ function buy(i) {
 
 // ---------- убежище и кухня ----------
 const DISHES = {
-  roast: { n: 'Жаркое',       c: { meat: 2, herbs: 1 }, t: '+16 энергии' },
-  broth: { n: 'Бульон',       c: { meat: 1, food: 1 },  t: '+35% здоровья, +6 энергии' },
-  tea:   { n: 'Травяной чай', c: { herbs: 2 },          t: 'снимает яд, +4 энергии' },
-  stew:  { n: 'Рагу',         c: { herbs: 2, food: 1 }, t: '+12 энергии, +5 здоровья' },
+  tea:      { n: 'Травяной чай',    c: { herbs: 2 },                      t: 'снимает яд, +4 энергии',                  eff: { cure: 1, en: 4 } },
+  stew:     { n: 'Рагу',            c: { herbs: 2, food: 1 },             t: '+12 энергии, +5 здоровья',                eff: { en: 12, hp: 5 } },
+  porridge: { n: 'Каша',            c: { food: 1, herbs: 1 },             t: '+10 энергии, +5 здоровья',                eff: { en: 10, hp: 5 } },
+  bar:      { n: 'Энергобатончик',  c: { shrooms: 1, chem: 1 },           t: '+8 энергии',                              eff: { en: 8 } },
+  roast:    { n: 'Жаркое',          c: { meat: 2, herbs: 1 },             t: '+16 энергии',                             eff: { en: 16 } },
+  soup:     { n: 'Грибной суп',     c: { shrooms: 2, herbs: 1 },          t: '+14 энергии, +10% здоровья',              eff: { en: 14, hpPct: 0.1 } },
+  pie:      { n: 'Пирог',           c: { meat: 1, shrooms: 1, herbs: 1 }, t: '+12 энергии, +20% здоровья',              eff: { en: 12, hpPct: 0.2 } },
+  antidote: { n: 'Целебный отвар',  c: { herbs: 2, shrooms: 1 },          t: 'снимает яд и кровотечение, +8 здоровья',  eff: { cure: 1, hp: 8 } },
+  broth:    { n: 'Бульон',          c: { meat: 1, food: 1 },              t: '+35% здоровья, +6 энергии',               eff: { hpPct: 0.35, en: 6 } },
+  skewer:   { n: 'Шашлык',          c: { meat: 2, shrooms: 1 },           t: '+22 энергии, +10% здоровья',              eff: { en: 22, hpPct: 0.1 } },
+  feast:    { n: 'Пир',             c: { meat: 3, herbs: 2, shrooms: 2 }, t: '+30 энергии, +50% здоровья, снимает яд',  eff: { en: 30, hpPct: 0.5, cure: 1 } },
 };
 const totalDishes = () => Object.values(S.dish).reduce((a, b) => a + b, 0);
 const returnCost = () => Math.max(1, Math.ceil(S.floor / 25));
@@ -549,7 +568,7 @@ function returnUp() {
 }
 function sleep() {
   if (S.screen !== 'base' || S.en < 6) return;
-  S.en -= 6; S.hp = S.maxHp; S.poison = 0; S.stunned = false; S.sleeps++;
+  S.en -= 6; S.hp = S.maxHp; S.poison = 0; S.bleed = 0; S.stunned = false; S.sleeps++;
   log('Ты спишь несколько часов. Здоровье восстановлено (-6 энергии).', 'good'); sfx('pickup');
   if (S.floor >= 10 && chance(0.15)) {
     log('Среди ночи что-то шевелится в темноте!', 'bad');
@@ -560,7 +579,7 @@ function sleep() {
 function cook(id) {
   const d = DISHES[id];
   if (S.screen !== 'kitchen' || S.kitchen < DISH_LEVEL[id] || !canPay(d.c)) return;
-  pay(d.c); S.dish[id]++; S.cooked++;
+  pay(d.c); S.dish[id] = (S.dish[id] || 0) + 1; S.cooked++;
   log(`Готово: ${d.n}.`, 'good'); sfx('pickup'); render(); save();
 }
 function upgrade(what) {
@@ -599,10 +618,12 @@ function openMeals() { S.mealFrom = S.screen; S.screen = 'meals'; render(); }
 function eatDish(id) {
   if (!S.dish[id]) return;
   S.dish[id]--;
-  if (id === 'roast') { S.en = Math.min(S.maxEn, S.en + 16); log('Жаркое: +16 энергии.', 'good'); }
-  else if (id === 'broth') { const h = Math.round(S.maxHp * 0.35); S.hp = Math.min(S.maxHp, S.hp + h); S.en = Math.min(S.maxEn, S.en + 6); log(`Бульон: +${h} здоровья, +6 энергии.`, 'good'); }
-  else if (id === 'tea') { S.poison = 0; S.en = Math.min(S.maxEn, S.en + 4); log('Чай: яд снят, +4 энергии.', 'good'); }
-  else if (id === 'stew') { S.en = Math.min(S.maxEn, S.en + 12); S.hp = Math.min(S.maxHp, S.hp + 5); log('Рагу: +12 энергии, +5 здоровья.', 'good'); }
+  const f = DISHES[id].eff, parts = [];
+  if (f.en) { const g = Math.round(f.en * (S.passive === 'glutton' ? 1.5 : 1)); S.en = Math.min(S.maxEn, S.en + g); parts.push(`+${g} энергии`); }
+  const h = (f.hp || 0) + (f.hpPct ? Math.round(S.maxHp * f.hpPct) : 0);
+  if (h) { S.hp = Math.min(S.maxHp, S.hp + h); parts.push(`+${h} здоровья`); }
+  if (f.cure) { if (S.poison || S.bleed) parts.push('болезни сняты'); S.poison = 0; S.bleed = 0; }
+  log(`${DISHES[id].n}: ${parts.join(', ')}.`, 'good');
   S.screen = S.mealFrom;
   if (S.screen === 'fight') enemyTurn(); else { render(); save(); }
 }
@@ -620,6 +641,7 @@ const VEND = [
   { n: 'Травы ×2',            give: { herbs: 2 },  cost: 3 },
   { n: 'Мясо',                give: { meat: 1 },   cost: 4 },
   { n: 'Ключ',                give: { keys: 1 },   cost: 6 },
+  { n: 'Грибы ×2',            give: { shrooms: 2 }, cost: 3 },
 ];
 function giveItems(give) {
   Object.entries(give).forEach(([k, v]) => S[k] += v);
@@ -701,6 +723,64 @@ const EVENTS = [
     choices: [
       { l: 'Ответить и пообещать прийти', ok: () => !S.quest && S.floor < TOP - 6, run: () => startQuest() },
       { l: 'Положить трубку', run: () => log('Ты кладёшь трубку. Телефон замолкает.') } ] },
+  { text: 'Склад гуманитарной помощи: ящики с красным крестом, никого рядом.',
+    choices: [
+      { l: 'Забрать всё', run: () => { S.greed++; S.scrap += 6; S.food += 2; log('Ты выгребаешь всё: +6🔩, +2🍖. Совесть молчит.'); } },
+      { l: 'Взять немного, остальное оставить', run: () => { S.mercy++; S.scrap += 3; S.food += 1; log('Ты берёшь только необходимое: +3🔩, +1🍖.', 'good'); } } ] },
+  { text: 'Раненый дрон-курьер мигает аварийным светом и просит помощи.',
+    choices: [
+      { l: 'Починить (-2🔩, -1🧵)', ok: () => S.scrap >= 2 && S.cloth >= 1, run: () => { S.scrap -= 2; S.cloth -= 1; S.mercy++; S.keys++; log('Дрон благодарит и отдаёт ключ-карту: +1🔑.', 'good'); } },
+      { l: 'Разобрать на запчасти', run: () => { S.greed++; S.scrap += 3; S.chem += 2; log('+3🔩 и +2🧪 из корпуса.'); } },
+      { l: 'Уйти', run: () => log('Дрон тихо щёлкает тебе вслед.') } ] },
+  { text: 'Из-за угла тянет запахом жареного. Кто-то готовит.',
+    choices: [
+      { l: 'Идти на запах', run: () => { if (chance(0.6)) { S.herbs += 1; S.shrooms += 2; log('Брошенная плита с грибами: +2🍄, +1🌿.', 'good'); } else { log('На кухне кто-то есть!', 'bad'); return 'fight'; } } },
+      { l: 'Обойти', run: () => log('Ты не рискуешь.') } ] },
+  { text: 'Кладовая за заклинившей дверью лифта. Виден только край ящика.',
+    choices: [
+      { l: 'Вскрыть монтировкой (-2 энергии)', run: () => { spendEnergy(2); if (chance(0.6)) { S.keys++; S.scrap += 3; log('Внутри ключ и немного лома: +1🔑, +3🔩.', 'good'); } else { S.hp -= 4; log('Дверь срывается и бьёт тебя: -4 здоровья.', 'bad'); } } },
+      { l: 'Пройти мимо', run: () => log('Не твоя дверь.') } ] },
+  { text: 'Бродячий торговец шепчет: «Есть ключи, есть лекарства. Что тебе нужно?»',
+    choices: [
+      { l: 'Купить ключ (8🔩)', ok: () => S.scrap >= 8, run: () => { S.scrap -= 8; S.keys++; log('Ты получаешь ключ: +1🔑.', 'good'); } },
+      { l: 'Отдать гранату за аптечку', ok: () => S.grenade > 0, run: () => { S.grenade--; S.medkit++; log('Обмен состоялся: +1💉.', 'good'); } },
+      { l: 'Уйти', run: () => log('Торговец пожимает плечами.') } ] },
+  { min: 6, text: 'Коридор из зеркал. В одном отражении кто-то стоит не в такт с тобой.',
+    choices: [
+      { l: 'Подойти', run: () => { if (chance(0.5)) { log('Отражение оживает и бросается на тебя!', 'bad'); return 'fight'; } gainXp(10); log('Ничего не происходит, но ты чувствуешь себя опытнее: +10 опыта.'); } },
+      { l: 'Закрыть глаза и пройти', run: () => { spendEnergy(1); log('Ты проходишь вслепую. -1 энергии.'); } } ] },
+  { min: 15, text: 'Оранжерея: стёкла выбиты, но растения выжили.',
+    choices: [
+      { l: 'Собрать травы и грибы', run: () => { S.herbs += 3; S.shrooms += 2; log('+3🌿 и +2🍄.', 'good'); } },
+      { l: 'Съесть ягоды на месте', run: () => { S.en = Math.min(S.maxEn, S.en + 8); if (chance(0.2)) { S.poison = 3; log('+8 энергии, но ягоды оказались ядовитыми.', 'bad'); } else log('+8 энергии.', 'good'); } } ] },
+  { min: 10, text: 'Холодильная камера. Дверь приоткрыта, внутри иней.',
+    choices: [
+      { l: 'Заглянуть', run: () => { if (chance(0.7)) { S.meat += 3; log('Замороженное мясо: +3🥩.', 'good'); } else { S.poison = 3; log('Тухлая вонь бьёт в лицо: ты отравлен.', 'bad'); } } },
+      { l: 'Закрыть дверь', run: () => log('Лучше не тревожить.') } ] },
+  { min: 5, text: 'Аварийный генератор, но он не запущен.',
+    choices: [
+      { l: 'Починить (-3🔩)', ok: () => S.scrap >= 3, run: () => { S.scrap -= 3; S.freeSteps += 5; log('Свет вспыхивает: следующие 5 шагов не тратят энергию.', 'good'); } },
+      { l: 'Разобрать на детали', run: () => { S.chem += 2; log('+2🧪.', 'good'); } } ] },
+  { text: 'На стене детским почерком: «Мама, я жду тебя наверху». Рядом лежит записка.',
+    choices: [
+      { l: 'Прочитать записку', run: () => { S.mercy++; const left = NOTES.map((_, i) => i).filter(i => !S.notes.includes(i)); if (left.length) { S.notes.push(pick(left)); log('Ты находишь новую запись в дневник.', 'good'); } else { gainXp(8); log('Ты уже знаешь всё, что здесь написано. +8 опыта.'); } } },
+      { l: 'Не трогать', run: () => log('Ты оставляешь записку на месте.') } ] },
+  { min: 8, text: 'За столом трое играют в карты на лом. Тебе кивают на свободный стул.',
+    choices: [
+      { l: 'Сыграть на 5🔩', ok: () => S.scrap >= 5, run: () => { S.greed++; if (chance(0.45)) { S.scrap += 10; log('Удача! +10🔩.', 'good'); } else { S.scrap -= 5; log('Проигрыш: -5🔩.', 'bad'); } } },
+      { l: 'Отказаться', run: () => log('Ты качаешь головой и идёшь дальше.') } ] },
+  { min: 12, text: 'Усталая медсестра в углу: «Если найдётся что-нибудь поесть, я тебя подлатаю».',
+    choices: [
+      { l: 'Отдать паёк (-1🍖)', ok: () => S.food > 0, run: () => { S.food--; S.mercy++; S.hp = S.maxHp; S.poison = 0; S.bleed = 0; log('Она накладывает швы и повязки: здоровье полностью восстановлено.', 'good'); } },
+      { l: 'Уйти', run: () => log('Тебе нечем с ней поделиться.') } ] },
+  { min: 20, text: 'Красная тревожная кнопка на стене, защитное стекло разбито.',
+    choices: [
+      { l: 'Нажать', run: () => { if (chance(0.5)) { log('Взвыла сирена, и на шум идёт охрана!', 'bad'); return 'fight'; } S.medkit++; S.grenade++; log('Открывается тайник: +1💉, +1💣.', 'good'); } },
+      { l: 'Не трогать', run: () => log('Ты не рискуешь.') } ] },
+  { min: 3, text: 'На стене старая схема этажа, часть карты ещё читается.',
+    choices: [
+      { l: 'Изучить (-1 энергии)', run: () => { spendEnergy(1); S.rooms.forEach(r => { r.known = true; }); log('Ты запоминаешь расположение комнат: они подписаны.', 'good'); } },
+      { l: 'Идти дальше', run: () => log('Не до карт.') } ] },
 ];
 
 function startQuest() {
@@ -722,7 +802,7 @@ function checkQuest() {
 }
 
 function startEvent() {
-  const ev = pick(EVENTS);
+  const ev = pick(EVENTS.filter(e => !e.min || S.floor >= e.min));
   S.event = ev; S.screen = 'event';
   log(ev.text, 'story');
   render(); save();
@@ -847,9 +927,11 @@ function enemyTurn() {
     if (landed && e.poison && !S.defending && chance(0.35) && !S.poison) { S.poison = 3 + (S.passive === 'glutton' ? 2 : 0); log('Ты отравлен!', 'bad'); }
     if (landed && e.stun && !S.defending && chance(0.2)) { S.stunned = true; log('Удар оглушил тебя: следующая атака пропадёт!', 'bad'); }
     if (landed && e.drain && chance(0.5)) { S.en = Math.max(0, S.en - 2); log('Враг вытягивает силы: -2 энергии.', 'bad'); }
+    if (landed && e.bleed && !S.defending && chance(0.35) && !S.bleed) { S.bleed = 3; log('Ты истекаешь кровью!', 'bad'); }
   }
   S.defending = false;
   if (S.poison > 0) { const pd = has('stomach') ? 1 : 2; S.poison--; S.hp -= pd; log(`Яд: -${pd} здоровья.`, 'bad'); }
+  if (S.bleed > 0) { const bd = 1 + Math.floor(S.floor / 25); S.bleed--; S.hp -= bd; log(`Кровотечение: -${bd} здоровья.`, 'bad'); }
   if (checkDeath()) return;
   render(); save();
 }
@@ -933,8 +1015,8 @@ const head = (a, t) => { const d = document.createElement('div'); d.className = 
 
 function consumableButtons(a) {
   a.appendChild(btn(`Паёк 🍖${S.food}`, () => useItem('food'), '', S.food <= 0 || S.en >= S.maxEn));
-  a.appendChild(btn(`Бинт 🩹${S.meds}`, () => useItem('meds'), '', S.meds <= 0 || S.hp >= S.maxHp));
-  a.appendChild(btn(`Аптечка 💉${S.medkit}`, () => useItem('medkit'), '', S.medkit <= 0 || (S.hp >= S.maxHp && !S.poison)));
+  a.appendChild(btn(`Бинт 🩹${S.meds}`, () => useItem('meds'), '', S.meds <= 0 || (S.hp >= S.maxHp && !S.bleed)));
+  a.appendChild(btn(`Аптечка 💉${S.medkit}`, () => useItem('medkit'), '', S.medkit <= 0 || (S.hp >= S.maxHp && !S.poison && !S.bleed)));
   a.appendChild(btn(`Стим ⚡${S.stim}`, () => useItem('stim'), '', S.stim <= 0 || S.en >= S.maxEn));
   a.appendChild(btn(`🍲 Блюда ${totalDishes()}`, openMeals, 'full', totalDishes() === 0));
   const ap = ACTIVES.find(x => x.id === S.active);
@@ -953,8 +1035,8 @@ function render() {
   $('lvl').textContent = `Ур. ${S.lvl}`;
   $('t-xp').textContent = `${S.xp}/${S.lvl * 20}`;
   $('inv').innerHTML =
-    `<span>🔩${S.scrap}</span><span>🧵${S.cloth}</span><span>🧪${S.chem}</span><span>🥩${S.meat}</span><span>🌿${S.herbs}</span>` +
-    `<span>🔑${S.keys}</span><span>💣${S.grenade}</span><span>⚔️ ${weapon().n}</span><span>🛡️ ${armor().n}</span>` + (S.poison ? '<span style="color:var(--hp)">☠️ яд</span>' : '');
+    `<span>🔩${S.scrap}</span><span>🧵${S.cloth}</span><span>🧪${S.chem}</span><span>🥩${S.meat}</span><span>🌿${S.herbs}</span><span>🍄${S.shrooms}</span>` +
+    `<span>🔑${S.keys}</span><span>💣${S.grenade}</span><span>⚔️ ${weapon().n}</span><span>🛡️ ${armor().n}</span>` + (S.poison ? '<span style="color:var(--hp)">☠️ яд</span>' : '') + (S.bleed ? '<span style="color:var(--hp)">🩸 кровь</span>' : '');
 
   const a = $('actions'); a.innerHTML = '';
   switch (S.screen) {
@@ -1037,10 +1119,10 @@ function render() {
       break;
     }
     case 'kitchen':
-      head(a, `Кухня ур.${S.kitchen}. Ингредиенты: 🥩${S.meat} 🌿${S.herbs} 🍖${S.food}. Блюд готово: ${totalDishes()}`);
+      head(a, `Кухня ур.${S.kitchen}. Ингредиенты: 🥩${S.meat} 🌿${S.herbs} 🍄${S.shrooms} 🍖${S.food}. Блюд готово: ${totalDishes()}`);
       Object.entries(DISHES).forEach(([id, d]) => {
         const lock = S.kitchen < DISH_LEVEL[id];
-        a.appendChild(btn(lock ? `🔒 ${d.n}: нужна кухня ур.${DISH_LEVEL[id]}` : `${d.n} — ${costText(d.c)} (${d.t}) ×${S.dish[id]}`, () => cook(id), 'full', lock || !canPay(d.c)));
+        a.appendChild(btn(lock ? `🔒 ${d.n}: нужна кухня ур.${DISH_LEVEL[id]}` : `${d.n} — ${costText(d.c)} (${d.t}) ×${S.dish[id] || 0}`, () => cook(id), 'full', lock || !canPay(d.c)));
       });
       a.appendChild(btn('← Назад', () => { S.screen = 'base'; render(); }, 'full'));
       break;
