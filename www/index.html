@@ -8,27 +8,30 @@
 </head>
 <body>
 <div id="app">
-  <div class="panel" id="hud">
-    <div id="top"><span id="floor"></span><span id="zone"></span><button id="mute" title="Звук и вибрация">🔊</button></div>
-    <div class="bars">
-      <div class="bar"><span>Здоровье</span><div class="track"><div class="fill" id="b-hp" style="background:var(--hp)"></div></div><span id="t-hp"></span></div>
-      <div class="bar"><span>Энергия</span><div class="track"><div class="fill" id="b-en" style="background:var(--en)"></div></div><span id="t-en"></span></div>
-      <div class="bar"><span id="lvl"></span><div class="track"><div class="fill" id="b-xp" style="background:var(--accent)"></div></div><span id="t-xp"></span></div>
+  <div id="scene" class="z0">
+    <svg id="sv" viewBox="0 24 360 400" preserveAspectRatio="xMidYMax meet" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div id="hud">
+      <div id="hud-l" class="glass">
+        <div class="bar"><b>❤️</b><div class="track"><div class="fill hp" id="b-hp"></div></div><span id="t-hp"></span></div>
+        <div class="bar"><b>🍖</b><div class="track"><div class="fill en" id="b-en"></div></div><span id="t-en"></span></div>
+        <div class="bar"><b id="lvl"></b><div class="track"><div class="fill xp" id="b-xp"></div></div><span id="t-xp"></span></div>
+      </div>
+      <div id="hud-r">
+        <div id="sign" class="glass"><div id="floor"></div><div id="zone"></div><div id="quest"></div></div>
+        <div id="hud-btns">
+          <button id="btn-hl" title="Подсветить предметы">👁</button><button id="btn-fast" title="Быстрая ходьба">⏩</button><button id="mute" title="Звук">🔊</button><button id="btn-set" title="Настройки">⚙</button>
+        </div>
+      </div>
     </div>
+    <div id="toast"></div>
     <div id="inv"></div>
   </div>
-  <div id="scene" class="panel z0">
-    <div id="sc-bg"></div><div id="sc-lamp"></div><div id="sc-sign"></div>
-    <div id="sc-doors"></div>
-    <div id="sc-lift" class="lift"><span class="lf-x">✖</span></div>
-    <div id="sc-center"></div>
-    <div id="sc-hero"></div>
-    <div id="sc-enemy"><div id="en-name"></div><div class="track ehpbar"><div class="fill" id="ehp"></div></div><div id="en-tr"></div><div id="en-ic">👾</div><div id="zones"></div></div>
-    <div id="sc-floor"></div>
-  </div>
-  <div id="log" class="panel"></div>
-  <div id="actions"></div>
+  <div id="log"></div>
+  <div id="dock"></div>
 </div>
+<div id="sheet"><div id="sheet-title"></div><div id="sheet-body"><div id="actions"></div></div></div>
+<script src="art.js"></script>
+<script src="scene.js"></script>
 <script src="game.js"></script>
 </body>
 </html>

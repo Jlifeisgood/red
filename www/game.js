@@ -341,30 +341,6 @@ function load() {
   return false;
 }
 
-function fx(kind) {
-  if (kind === 'shake') {
-    const h = $('sc-hero'), app = $('app');
-    [app, h].forEach((el, i) => { const c = i ? 'hurt' : 'shake'; el.classList.remove(c); void el.offsetWidth; el.classList.add(c); setTimeout(() => el.classList.remove(c), 320); });
-    return;
-  }
-  const el = $('en-ic');
-  if (!el) return;
-  el.classList.remove('hitflash'); void el.offsetWidth; el.classList.add('hitflash');
-  setTimeout(() => el.classList.remove('hitflash'), 320);
-}
-function lunge(who) {
-  const el = $(who === 'hero' ? 'sc-hero' : 'sc-enemy'), c = who === 'hero' ? 'lunge-h' : 'lunge-e';
-  el.classList.remove(c); void el.offsetWidth; el.classList.add(c);
-  setTimeout(() => el.classList.remove(c), 380);
-}
-function floatText(text, cls, where) {
-  const host = $(where);
-  if (!host) return;
-  const el = document.createElement('span');
-  el.className = 'float ' + cls; el.textContent = text;
-  host.appendChild(el); setTimeout(() => el.remove(), 900);
-}
-
 function log(text, cls = '') {
   const el = $('log');
   [...el.children].forEach(c => c.classList.add('old'));
@@ -373,6 +349,13 @@ function log(text, cls = '') {
   el.appendChild(p);
   while (el.children.length > 60) el.removeChild(el.firstChild);
   el.scrollTop = el.scrollHeight;
+  if (cls === 'good' || (cls === 'bad' && S && S.screen !== 'fight')) toast(text.replace(/<[^>]+>/g, ''), cls);
+}
+let toastTimer = 0;
+function toast(text, cls) {
+  const t = $('toast');
+  t.textContent = text; t.className = 'show ' + cls;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.className = ''; }, 2300);
 }
 
 // ---------- этажи ----------
@@ -493,13 +476,15 @@ function ride() {
   ascend();
 }
 function repairLift() {
-  if (S.screen !== 'map' || !S.lift || !canPay(S.lift.cost)) return;
+  if ((S.screen !== 'map' && S.screen !== 'liftmenu') || !S.lift || !canPay(S.lift.cost)) return;
+  S.screen = 'map';
   pay(S.lift.cost); S.lift.state = 'ok'; S.repairs++;
   log('Ты чинишь лифт. Кабина вздрагивает и оживает.', 'good'); sfx('pickup');
   render(); save();
 }
 function climbRope() {
-  if (S.screen !== 'map') return;
+  if (S.screen !== 'map' && S.screen !== 'liftmenu') return;
+  S.screen = 'map';
   if (!spendEnergy(4)) return;
   if (chance(0.35)) {
     const d = rnd(3, 6) + Math.floor(S.floor / 10);
@@ -625,7 +610,7 @@ function cook(id) {
   log(`Готово: ${d.n}.`, 'good'); sfx('pickup'); render(); save();
 }
 function upgrade(what) {
-  if (S.screen !== 'base') return;
+  if (!S.inBase) return;
   const lvl = what === 'bench' ? S.bench : S.kitchen;
   const c = (what === 'bench' ? BENCH_UP : KITCHEN_UP)[lvl + 1];
   if (!c || !canPay(c)) return;
@@ -1061,20 +1046,80 @@ function btn(text, fn, cls = '', disabled = false) {
 }
 const head = (a, t) => { const d = document.createElement('div'); d.className = 'head'; d.textContent = t; a.appendChild(d); };
 
-function consumableButtons(a) {
-  a.appendChild(btn(`Паёк 🍖${S.food}`, () => useItem('food'), '', S.food <= 0 || S.en >= S.maxEn));
-  a.appendChild(btn(`Бинт 🩹${S.meds}`, () => useItem('meds'), '', S.meds <= 0 || (S.hp >= S.maxHp && !S.bleed)));
-  a.appendChild(btn(`Аптечка 💉${S.medkit}`, () => useItem('medkit'), '', S.medkit <= 0 || (S.hp >= S.maxHp && !S.poison && !S.bleed)));
-  a.appendChild(btn(`Стим ⚡${S.stim}`, () => useItem('stim'), '', S.stim <= 0 || S.en >= S.maxEn));
-  a.appendChild(btn(`🍲 Блюда ${totalDishes()}`, openMeals, 'full', totalDishes() === 0));
-  const ap = ACTIVES.find(x => x.id === S.active);
-  if (ap) a.appendChild(btn(S.activeUsed ? `✨ ${ap.n} (использовано)` : `✨ ${ap.n}: ${ap.t.replace('Раз за забег: ', '')}`, useActive, 'full', S.activeUsed));
+const SHEET_TITLES = { vending: 'Вендинговый автомат', trader: 'Торговец', event: 'Происшествие', locked: 'Запертая дверь', craft: 'Верстак', kitchen: 'Кухня',
+  skills: 'Навыки', diary: 'Дневник', ach: 'Достижения', meals: 'Блюда', inv: 'Рюкзак', liftmenu: 'Лифт', start: 'Башня', help: 'Как играть',
+  settings: 'Настройки', transfer: 'Сохранение', dead: 'Конец пути', win: 'Победа' };
+const bodyIcon = k => `<svg viewBox="0 0 24 34" width="20" height="28" aria-hidden="true"><circle cx="12" cy="5" r="4" class="${k === 'head' ? 'on' : ''}"/><rect x="7" y="10" width="10" height="12" rx="3" class="${k === 'body' ? 'on' : ''}"/><rect x="2" y="10" width="4" height="12" rx="2" class="${k === 'arms' ? 'on' : ''}"/><rect x="18" y="10" width="4" height="12" rx="2" class="${k === 'arms' ? 'on' : ''}"/><rect x="7" y="23" width="4" height="10" rx="2" class="${k === 'legs' ? 'on' : ''}"/><rect x="13" y="23" width="4" height="10" rx="2" class="${k === 'legs' ? 'on' : ''}"/></svg>`;
+function dk(icon, label, fn, o = {}) {
+  const b = document.createElement('button');
+  b.className = 'dk' + (o.cls ? ' ' + o.cls : '');
+  b.disabled = !!o.disabled;
+  b.innerHTML = `<span class="ic">${icon}</span><span>${label}</span>` + (o.sub ? `<span class="sub">${o.sub}</span>` : '') + (o.badge ? `<i class="bd">${o.badge}</i>` : '');
+  b.onclick = () => { sfx('click'); fn(); };
+  return b;
+}
+function renderDock() {
+  const d = $('dock'); d.innerHTML = '';
+  const row = (c = '') => { const r = document.createElement('div'); r.className = 'dock-row ' + c; d.appendChild(r); return r; };
+  const go = sc => () => { S.screen = sc; render(); };
+  if (S.screen === 'fight' && S.enemy) {
+    const r1 = row();
+    Object.keys(PARTS).forEach(k => {
+      const g = dmgRange(k);
+      r1.appendChild(dk(bodyIcon(k), PARTS[k].n, () => attack(k), { cls: 'part primary', sub: `${Math.round(hitChance(k) * 100)}% · ${g[0]}–${g[1]}` }));
+    });
+    const r2 = row('scroll');
+    r2.appendChild(dk('🛡', 'Защита', defend));
+    r2.appendChild(dk('🏃', 'Бежать', flee, { disabled: S.passive === 'rush' }));
+    r2.appendChild(dk('💣', 'Граната', throwGrenade, { badge: S.grenade || '', disabled: S.grenade <= 0 }));
+    r2.appendChild(dk('🍖', 'Паёк', () => useItem('food'), { badge: S.food || '', disabled: S.food <= 0 || S.en >= S.maxEn }));
+    r2.appendChild(dk('🩹', 'Бинт', () => useItem('meds'), { badge: S.meds || '', disabled: S.meds <= 0 || (S.hp >= S.maxHp && !S.bleed) }));
+    r2.appendChild(dk('💉', 'Аптечка', () => useItem('medkit'), { badge: S.medkit || '', disabled: S.medkit <= 0 || (S.hp >= S.maxHp && !S.poison && !S.bleed) }));
+    r2.appendChild(dk('⚡', 'Стим', () => useItem('stim'), { badge: S.stim || '', disabled: S.stim <= 0 || S.en >= S.maxEn }));
+    r2.appendChild(dk('🍲', 'Блюда', openMeals, { badge: totalDishes() || '', disabled: totalDishes() === 0 }));
+    const ap = ACTIVES.find(x => x.id === S.active);
+    if (ap) r2.appendChild(dk('✨', ap.n, useActive, { disabled: S.activeUsed }));
+  } else if (S.screen === 'map') {
+    const r = row();
+    r.appendChild(dk('🎒', 'Рюкзак', go('inv')));
+    r.appendChild(dk('🛠', 'Верстак', go('craft')));
+    r.appendChild(dk('⭐', 'Навыки', go('skills'), { cls: S.sp ? 'primary' : '', badge: S.sp || '' }));
+    r.appendChild(dk('📖', 'Дневник', go('diary')));
+    r.appendChild(dk('🏆', 'Награды', go('ach')));
+    if (S.lift && S.lift.state === 'ok' && S.floor >= 3) r.appendChild(dk('🏠', 'Убежище', goBase));
+    r.appendChild(dk('❓', 'Справка', () => { S.helpFrom = 'map'; S.screen = 'help'; render(); }));
+  } else if (S.screen === 'base') {
+    const r = row();
+    r.appendChild(dk('🛏', 'Спать', sleep, { cls: 'primary', disabled: S.en < 6 }));
+    r.appendChild(dk('🍳', 'Кухня', go('kitchen')));
+    r.appendChild(dk('🛠', 'Верстак', go('craft')));
+    r.appendChild(dk('🎒', 'Рюкзак', go('inv')));
+    r.appendChild(dk('⭐', 'Навыки', go('skills'), { cls: S.sp ? 'primary' : '', badge: S.sp || '' }));
+    r.appendChild(dk('⬆', 'Наверх', returnUp, { cls: 'primary' }));
+  }
+}
+function layoutUI() {
+  const sc = S.screen, perk = sc === 'map' && S.pendingPerks > 0;
+  const full = ['start', 'help', 'settings', 'transfer'].includes(sc);
+  const sheet = perk || full || !!SHEET_TITLES[sc];
+  $('sheet').classList.toggle('open', sheet); $('sheet').classList.toggle('full', full);
+  $('sheet-title').textContent = perk ? 'Новый уровень!' : (SHEET_TITLES[sc] || '');
+  $('dock').style.display = sheet ? 'none' : '';
+  $('btn-hl').classList.toggle('on', $('sv').classList.contains('hl'));
+  $('btn-fast').classList.toggle('on', walkMs < 400);
+}
+function slotBtn(icon, name, count, fn, disabled, mat) {
+  const b = document.createElement('button');
+  b.className = 'slot' + (mat ? ' mat' : ''); b.disabled = !!disabled && !mat;
+  b.innerHTML = `<span class="si">${icon}</span><span>${name}</span>${count !== '' ? `<i>${count}</i>` : ''}`;
+  if (fn) b.onclick = () => { sfx('click'); fn(); };
+  return b;
 }
 
 function render() {
   checkAch();
-  $('floor').textContent = S.inBase ? `Убежище (этаж ${S.floor})` : `Этаж ${S.floor} / ${TOP}`;
-  $('zone').textContent = `${S.cycle ? 'Круг ' + (S.cycle + 1) + ' · ' : ''}${ZONES[zoneOf(S.floor)].name} · рекорд ${best || 1}`;
+  $('floor').textContent = S.inBase ? 'Убежище' : `Этаж ${S.floor} / ${TOP}`;
+  $('zone').textContent = `${S.cycle ? 'Круг ' + (S.cycle + 1) + ' · ' : ''}${S.inBase ? 'под этажом ' + S.floor : ZONES[zoneOf(S.floor)].name} · рекорд ${best || 1}`;
   $('b-hp').style.width = (S.hp / S.maxHp * 100) + '%';
   $('b-en').style.width = (S.en / S.maxEn * 100) + '%';
   $('b-xp').style.width = (S.xp / (S.lvl * 20) * 100) + '%';
@@ -1082,9 +1127,10 @@ function render() {
   $('t-en').textContent = `${S.en}/${S.maxEn}`;
   $('lvl').textContent = `Ур. ${S.lvl}`;
   $('t-xp').textContent = `${S.xp}/${S.lvl * 20}`;
+  $('quest').textContent = S.quest ? `📞 до этажа ${S.quest.floor}` : '';
   $('inv').innerHTML =
-    `<span>🔩${S.scrap}</span><span>🧵${S.cloth}</span><span>🧪${S.chem}</span><span>🥩${S.meat}</span><span>🌿${S.herbs}</span><span>🍄${S.shrooms}</span>` +
-    `<span>🔑${S.keys}</span><span>💣${S.grenade}</span><span>⚔️ ${weapon().n}</span><span>🛡️ ${armor().n}</span>` + (S.poison ? '<span style="color:var(--hp)">☠️ яд</span>' : '') + (S.bleed ? '<span style="color:var(--hp)">🩸 кровь</span>' : '');
+    `<span>🔩${S.scrap}</span><span>🧵${S.cloth}</span><span>🧪${S.chem}</span><span>🥩${S.meat}</span><span>🌿${S.herbs}</span><span>🍄${S.shrooms}</span><span>🔑${S.keys}</span>` +
+    (S.poison ? '<span style="color:var(--hp)">☠️яд</span>' : '') + (S.bleed ? '<span style="color:var(--hp)">🩸кровь</span>' : '');
 
   renderScene();
 
@@ -1097,29 +1143,37 @@ function render() {
         S.perkChoices.forEach(id => { const p = PERKS.find(x => x.id === id); a.appendChild(btn(`${p.n} — ${p.t}`, () => pickPerk(id), 'full primary')); });
         break;
       }
-      if (S.quest) head(a, `📞 Задание: дойти до этажа ${S.quest.floor} (осталось ${S.quest.floor - S.floor})`);
-      S.rooms.forEach((r, i) => {
-        const label = r.done ? `✔ ${roomName(r.type)}` : r.known ? `🚪 Дверь ${i + 1}: ${roomName(r.type)} (рентген)` : `🚪 Дверь ${i + 1}: ${r.hint}`;
-        a.appendChild(btn(label, () => enterDoor(i), 'full' + (r.done ? '' : ' primary'), r.done));
-      });
-      if (S.lift) {
-        if (S.lift.state === 'ok') a.appendChild(btn(`🛗 Лифт исправен — ${S.floor >= TOP ? 'на крышу' : 'ехать'} (-1 энергии)`, rideAnim, 'full primary'));
-        else {
-          a.appendChild(btn(`🛠 Починить лифт — ${costText(S.lift.cost)}`, repairLift, 'full primary', !canPay(S.lift.cost)));
-          a.appendChild(btn('🪢 Лезть по тросу (-4 энергии, риск травмы)', climbRope, 'full'));
-        }
-        if (S.lift.state === 'ok' && S.floor >= 3) a.appendChild(btn('🏠 Вниз, в убежище (-1 энергии)', goBase, 'full'));
-      }
-      head(a, 'Предметы');
-      consumableButtons(a);
-      a.appendChild(btn('🛠 Мастерская', () => { S.screen = 'craft'; render(); }));
-      a.appendChild(btn(`📖 Дневник ${S.notes.length}/${NOTES.length}`, () => { S.screen = 'diary'; render(); }));
-      a.appendChild(btn(`🏆 Достижения ${ACHS.filter(x => meta.ach[x.id]).length}/${ACHS.length}`, () => { S.screen = 'ach'; render(); }));
-      a.appendChild(btn(`⭐ Навыки${S.sp ? ' (' + S.sp + ')' : ''}`, () => { S.screen = 'skills'; render(); }, S.sp ? 'primary' : ''));
-      a.appendChild(btn('❓ Справка', () => { S.helpFrom = 'map'; S.screen = 'help'; render(); }));
-      a.appendChild(btn('⚙ Настройки', openSettings));
       break;
-    case 'start':
+    case 'inv': {
+      const eq = document.createElement('div'); eq.className = 'eq';
+      eq.innerHTML = `<div><b>⚔️ ${weapon().n}</b><small>урон +${weapon().d} · навык «${SK[WEAPON_SKILL[S.wi]]}»</small></div><div><b>🛡️ ${armor().n}</b><small>защита ${defArmor()}</small></div>`;
+      a.appendChild(eq);
+      head(a, 'Нажми на предмет, чтобы использовать:');
+      const g = document.createElement('div'); g.className = 'slots';
+      g.appendChild(slotBtn('🍖', 'Паёк', S.food, () => useItem('food'), S.food <= 0 || S.en >= S.maxEn));
+      g.appendChild(slotBtn('🩹', 'Бинт', S.meds, () => useItem('meds'), S.meds <= 0 || (S.hp >= S.maxHp && !S.bleed)));
+      g.appendChild(slotBtn('💉', 'Аптечка', S.medkit, () => useItem('medkit'), S.medkit <= 0 || (S.hp >= S.maxHp && !S.poison && !S.bleed)));
+      g.appendChild(slotBtn('⚡', 'Стим', S.stim, () => useItem('stim'), S.stim <= 0 || S.en >= S.maxEn));
+      Object.entries(DISHES).forEach(([id, d]) => { if (S.dish[id] > 0) g.appendChild(slotBtn('🍲', d.n, S.dish[id], () => { S.mealFrom = 'inv'; eatDish(id); }, false)); });
+      a.appendChild(g);
+      head(a, 'Материалы и ключи:');
+      const m = document.createElement('div'); m.className = 'slots';
+      [['🔩', 'Лом', S.scrap], ['🧵', 'Ткань', S.cloth], ['🧪', 'Химия', S.chem], ['🥩', 'Мясо', S.meat], ['🌿', 'Травы', S.herbs], ['🍄', 'Грибы', S.shrooms], ['🔑', 'Ключи', S.keys], ['💣', 'Гранаты', S.grenade]]
+        .forEach(([i, n, c]) => m.appendChild(slotBtn(i, n, c, null, false, true)));
+      a.appendChild(m);
+      const ap = ACTIVES.find(x => x.id === S.active);
+      if (ap) a.appendChild(btn(S.activeUsed ? `✨ ${ap.n} (использовано)` : `✨ ${ap.n}: ${ap.t.replace('Раз за забег: ', '')}`, useActive, 'full', S.activeUsed));
+      a.appendChild(btn('← Назад', () => { S.screen = S.inBase ? 'base' : 'map'; render(); }, 'full'));
+      break;
+    }
+    case 'liftmenu':
+      head(a, 'Кабина разбита и стоит между этажами. Лифт можно починить материалами или обойти по тросу.');
+      a.appendChild(btn(`🛠 Починить лифт — ${costText(S.lift.cost)}`, repairLift, 'full primary', !canPay(S.lift.cost)));
+      a.appendChild(btn('🪢 Лезть по тросу (-4 энергии, риск травмы)', climbRope, 'full'));
+      a.appendChild(btn('← Назад', () => { S.screen = 'map'; render(); }, 'full'));
+      break;
+    case 'start': {
+      const ta = document.createElement('div'); ta.className = 'title-art'; ta.innerHTML = TITLE_SVG; a.appendChild(ta);
       a.appendChild(btn(`Сложность: ${DIFFS[meta.diff]} (нажми, чтобы сменить)`, () => { meta.diff = (meta.diff + 1) % 3; saveMeta(); render(); }, 'full primary'));
       head(a, 'Пассивный перк (действует весь забег). Нажми ещё раз, чтобы снять:');
       PASSIVES.forEach(p => a.appendChild(unlockedAt(p.req)
@@ -1133,6 +1187,7 @@ function render() {
       a.appendChild(btn('⚙ Настройки', openSettings));
       a.appendChild(btn('▶ Начать забег', startRun, 'full primary'));
       break;
+    }
     case 'settings':
       head(a, 'Настройки. Сохранение идёт автоматически; здесь его можно перенести на другое устройство или после переустановки.');
       a.appendChild(btn(`🔊 Звук: ${muted ? 'выкл' : 'вкл'}`, () => { setMuted(!muted); render(); }, 'full'));
@@ -1185,25 +1240,14 @@ function render() {
       if (S.perks.length) head(a, 'Перки: ' + S.perks.map(id => PERKS.find(p => p.id === id).n).join(', '));
       a.appendChild(btn('← Назад', () => { S.screen = 'map'; render(); }, 'full'));
       break;
-    case 'base': {
-      head(a, `Убежище. Возврат на этаж ${S.floor}: -${returnCost()} энергии.`);
-      a.appendChild(btn('🛏 Спать (-6 энергии, полное здоровье)', sleep, 'full primary', S.en < 6));
-      a.appendChild(btn(`🍳 Кухня ур.${S.kitchen}`, () => { S.screen = 'kitchen'; render(); }));
-      a.appendChild(btn(`🛠 Верстак ур.${S.bench}`, () => { S.screen = 'craft'; render(); }));
-      const bu = BENCH_UP[S.bench + 1], ku = KITCHEN_UP[S.kitchen + 1];
-      if (bu) a.appendChild(btn(`🔧 Улучшить верстак — ${costText(bu)}`, () => upgrade('bench'), 'full', !canPay(bu)));
-      if (ku) a.appendChild(btn(`🔧 Улучшить кухню — ${costText(ku)}`, () => upgrade('kitchen'), 'full', !canPay(ku)));
-      a.appendChild(btn(`⭐ Навыки${S.sp ? ' (' + S.sp + ')' : ''}`, () => { S.screen = 'skills'; render(); }, 'full' + (S.sp ? ' primary' : '')));
-      consumableButtons(a);
-      a.appendChild(btn(`⬆ Вернуться на этаж ${S.floor}`, returnUp, 'full primary'));
-      break;
-    }
+    case 'base': break;
     case 'kitchen':
       head(a, `Кухня ур.${S.kitchen}. Ингредиенты: 🥩${S.meat} 🌿${S.herbs} 🍄${S.shrooms} 🍖${S.food}. Блюд готово: ${totalDishes()}`);
       Object.entries(DISHES).forEach(([id, d]) => {
         const lock = S.kitchen < DISH_LEVEL[id];
         a.appendChild(btn(lock ? `🔒 ${d.n}: нужна кухня ур.${DISH_LEVEL[id]}` : `${d.n} — ${costText(d.c)} (${d.t}) ×${S.dish[id] || 0}`, () => cook(id), 'full', lock || !canPay(d.c)));
       });
+      if (S.inBase && KITCHEN_UP[S.kitchen + 1]) a.appendChild(btn(`🔧 Улучшить кухню до ур.${S.kitchen + 1} — ${costText(KITCHEN_UP[S.kitchen + 1])}`, () => upgrade('kitchen'), 'full primary', !canPay(KITCHEN_UP[S.kitchen + 1])));
       a.appendChild(btn('← Назад', () => { S.screen = 'base'; render(); }, 'full'));
       break;
     case 'meals':
@@ -1223,6 +1267,7 @@ function render() {
         a.appendChild(btn(lock ? `🔒 ${na.n}: нужен верстак ур.${need} (улучшается в убежище)` : `🛡️ ${na.n} (защита ${na.a}) — ${costText(na.c)}`, () => craft('armor', S.ai + 1), 'full', lock || !canPay(na.c)));
       }
       Object.entries(RECIPES).forEach(([k, r]) => a.appendChild(btn(`${RES_ICON[k]} ${r.n} — ${costText(r.c)}`, () => craft('res', k), 'full', !canPay(r.c))));
+      if (S.inBase && BENCH_UP[S.bench + 1]) a.appendChild(btn(`🔧 Улучшить верстак до ур.${S.bench + 1} — ${costText(BENCH_UP[S.bench + 1])}`, () => upgrade('bench'), 'full primary', !canPay(BENCH_UP[S.bench + 1])));
       a.appendChild(btn('← Назад', () => { S.screen = S.inBase ? 'base' : 'map'; render(); }, 'full'));
       break;
     }
@@ -1243,153 +1288,21 @@ function render() {
       a.appendChild(btn('Уйти', () => { S.screen = 'map'; render(); }, 'full primary'));
       break;
     case 'event':
+      head(a, S.event.text);
       S.event.choices.forEach((c, i) => a.appendChild(btn(c.l, () => eventChoice(i), 'full', c.ok ? !c.ok() : false)));
       break;
-    case 'fight': {
-      const e = S.enemy;
-      Object.keys(PARTS).forEach(k => {
-        const r = dmgRange(k);
-        a.appendChild(btn(`${PARTS[k].n} ${Math.round(hitChance(k) * 100)}% · ${r[0]}–${r[1]}`, () => attack(k), 'primary'));
-      });
-      head(a, 'Руки: враг слабее бьёт. Ноги: враг может пропустить ход.');
-      a.appendChild(btn('Защита', defend));
-      a.appendChild(btn('Бежать', flee, '', S.passive === 'rush'));
-      a.appendChild(btn(`Граната 💣${S.grenade}`, throwGrenade, 'full', S.grenade <= 0));
-      consumableButtons(a);
-      break;
-    }
+    case 'fight': break;
     default:
+      head(a, statsLine());
       if (S.screen === 'win') a.appendChild(btn(`Новая игра+ (круг ${S.cycle + 2}, герой сохраняется)`, newGamePlus, 'full primary'));
       a.appendChild(btn(S.screen === 'win' ? 'Новая игра с нуля' : 'Начать заново', newGame, 'full' + (S.screen === 'win' ? '' : ' primary')));
   }
+  layoutUI();
+  renderDock();
 }
 function roomName(t) {
   return { loot: 'Склад', enemy: 'Логово', rest: 'Убежище', trap: 'Ловушка', trader: 'Торговец',
            event: 'Происшествие', empty: 'Пусто', vending: 'Автомат', locked: 'Запертая комната' }[t];
-}
-
-// ---------- 2D-сцена: этаж в разрезе, герой ходит туда-сюда ----------
-const HERO_SVG = `<svg viewBox="0 0 40 72" aria-hidden="true">
-  <ellipse cx="20" cy="69" rx="13" ry="3" fill="rgba(0,0,0,.4)"/>
-  <rect x="13" y="44" width="6" height="24" rx="3" fill="#2b3a55"/><rect x="21" y="44" width="6" height="24" rx="3" fill="#2b3a55"/>
-  <rect x="3" y="24" width="9" height="17" rx="3" fill="#7a5c3a"/>
-  <rect x="10" y="21" width="20" height="26" rx="6" fill="#4a6fa5"/>
-  <rect x="27" y="23" width="6" height="22" rx="3" fill="#3b5b8c"/>
-  <circle cx="20" cy="13" r="9" fill="#e8c39e"/>
-  <path d="M10.5 13a9.5 9.5 0 0 1 19 0v-1.5h-19z" fill="#2f3b52"/>
-</svg>`;
-const WPN_ICON = ['✊', '🔩', '🏏', '🗡', '⚡', '🔥', '⚔'];
-const ROOM_ICON = { loot: '📦', enemy: '☠', rest: '🛏', trap: '⚠', trader: '🧳', event: '❓', empty: '·', vending: '🥤', locked: '🔒' };
-const SCREEN_ICON = { vending: '🥤', trader: '🧳', event: '❓', locked: '🔒', kitchen: '🍳', craft: '🛠', skills: '⭐', diary: '📖', ach: '🏆', meals: '🍲' };
-const DOOR_X = [12, 38, 64], LIFT_X = 89;
-let heroX = 6, sceneBusy = false, sceneKey = null, sceneMode = '', doorEls = [];
-
-function initScene() {
-  for (let i = 0; i < 3; i++) {
-    const d = document.createElement('div');
-    d.className = 'door'; d.style.left = DOOR_X[i] + '%';
-    d.innerHTML = '<div class="d-ic"></div><div class="d-leaf"><i></i></div><div class="d-n"></div>';
-    d.onclick = () => sceneTap(i);
-    $('sc-doors').appendChild(d); doorEls.push(d);
-  }
-  $('sc-lift').onclick = () => sceneTap('lift');
-  $('sc-hero').innerHTML = '<div class="hhp"><i></i></div>' + HERO_SVG + '<span class="wpn"></span>';
-  $('zones').innerHTML = ['head', 'body', 'armL', 'armR', 'legs'].map(z => `<div class="zone z-${z}" data-z="${z}"></div>`).join('');
-  $('zones').onclick = ev => {
-    const z = ev.target.dataset && ev.target.dataset.z;
-    if (!z || S.screen !== 'fight') return;
-    sfx('click'); attack(z.startsWith('arm') ? 'arms' : z);
-  };
-}
-function setHero(x, walk) {
-  const h = $('sc-hero');
-  h.classList.toggle('face-l', x < heroX);
-  if (walk) h.classList.add('walk');
-  heroX = x; h.style.left = x + '%';
-}
-function walkThen(x, fn) {
-  if (sceneBusy) return;
-  sceneBusy = true; setHero(x, true);
-  setTimeout(() => { sceneBusy = false; $('sc-hero').classList.remove('walk'); fn(); }, 520);
-}
-function enterDoor(i) {
-  const r = S.rooms[i];
-  if (S.screen !== 'map' || !r || r.done) return;
-  walkThen(DOOR_X[i], () => {
-    doorEls[i].classList.add('open'); setTimeout(() => doorEls[i].classList.remove('open'), 450);
-    openRoom(i);
-  });
-}
-function rideAnim() {
-  if (S.screen !== 'map' || !S.lift || S.lift.state !== 'ok') return;
-  walkThen(LIFT_X, () => {
-    $('sc-lift').classList.add('open'); setTimeout(() => $('sc-lift').classList.remove('open'), 500);
-    ride();
-  });
-}
-function sceneTap(i) {
-  if (sceneBusy) return;
-  if (S.screen === 'map') {
-    if (i === 'lift') { if (S.lift && S.lift.state === 'ok') rideAnim(); else log('Кабина разбита. Лифт можно починить кнопкой ниже.'); return; }
-    enterDoor(i);
-  } else if (S.screen === 'base' && S.inBase) {
-    if (i === 'lift') return walkThen(LIFT_X, returnUp);
-    [() => walkThen(DOOR_X[0], sleep),
-     () => walkThen(DOOR_X[1], () => { S.screen = 'kitchen'; render(); }),
-     () => walkThen(DOOR_X[2], () => { S.screen = 'craft'; render(); })][i]();
-  }
-}
-function renderScene() {
-  const sc = $('scene');
-  if (['start', 'help', 'settings', 'transfer'].includes(S.screen)) { sc.style.display = 'none'; return; }
-  sc.style.display = 'block';
-  const fight = S.screen === 'fight' && !!S.enemy, inBase = !!S.inBase, h = $('sc-hero');
-  const icon = fight ? '' : (SCREEN_ICON[S.screen] || '');
-  sc.className = 'panel ' + (inBase ? 'base' : 'z' + zoneOf(S.floor)) + (fight ? ' fight' : '') + (S.screen === 'dead' ? ' dead' : '') + (icon && !inBase ? ' dim' : '');
-  $('sc-sign').textContent = inBase ? 'Убежище' : `Этаж ${S.floor}`;
-  $('sc-center').textContent = icon;
-
-  // новый этаж / вход в убежище: герой входит слева
-  const key = inBase ? 'base' : S.rooms;
-  if (sceneKey !== key) {
-    sceneKey = key; sceneBusy = false;
-    h.style.transition = 'none'; h.style.left = '-6%'; heroX = -6; void h.offsetWidth; h.style.transition = '';
-    setHero(6, true); setTimeout(() => h.classList.remove('walk'), 560);
-  }
-  const mode = fight ? 'fight' : 'floor';
-  if (mode !== sceneMode) { sceneMode = mode; h.classList.remove('face-l'); }
-  h.style.left = (fight ? 16 : heroX) + '%';
-  h.querySelector('.wpn').textContent = WPN_ICON[S.wi] || '✊';
-  h.querySelector('.hhp i').style.width = Math.max(0, S.hp / S.maxHp * 100) + '%';
-
-  for (let i = 0; i < 3; i++) {
-    const d = doorEls[i], r = S.rooms[i], ic = d.querySelector('.d-ic'), n = d.querySelector('.d-n');
-    d.style.display = fight ? 'none' : '';
-    if (inBase) {
-      d.className = 'door furn'; ic.textContent = ['🛏', '🍳', '🛠'][i]; n.textContent = ['Сон', 'Кухня', 'Верстак'][i];
-    } else {
-      const known = r && (r.done || r.known);
-      d.className = 'door' + (r && r.done ? ' done' : '') + (known && r.type === 'locked' ? ' locked' : '');
-      ic.textContent = known ? ROOM_ICON[r.type] || '' : ''; n.textContent = i + 1;
-    }
-  }
-  const lift = $('sc-lift');
-  lift.style.display = fight || (!S.lift && !inBase) ? 'none' : '';
-  lift.className = 'lift ' + (inBase || (S.lift && S.lift.state === 'ok') ? 'ok' : 'broken');
-
-  const en = $('sc-enemy');
-  en.style.display = fight ? 'block' : 'none';
-  if (fight) {
-    const e = S.enemy;
-    $('en-ic').textContent = ICONS[e.n] || '👾';
-    $('en-name').textContent = `${e.n} ${Math.max(0, e.hp)}/${e.maxHp}`;
-    $('ehp').style.width = Math.max(0, e.hp / e.maxHp * 100) + '%';
-    $('en-tr').textContent = traitIcons(e) + (e.weak > 0 ? ' ослаблен' : '') + (e.stag > 0 ? ' шатается' : '');
-    document.querySelectorAll('#zones .zone').forEach(z => {
-      const part = z.dataset.z.startsWith('arm') ? 'arms' : z.dataset.z;
-      z.textContent = z.dataset.z === 'armR' ? '' : Math.round(hitChance(part) * 100) + '%';
-    });
-  }
 }
 
 // ---------- настройки, перенос сохранения ----------
@@ -1423,7 +1336,7 @@ function openSettings() { S.settingsFrom = S.screen; confirmReset = false; S.scr
 // ---------- кнопка «Назад» (Android) ----------
 function backAction() {
   const back = { craft: S.inBase ? 'base' : 'map', diary: 'map', ach: 'map', skills: S.inBase ? 'base' : 'map',
-                 kitchen: 'base', meals: S.mealFrom, help: S.helpFrom || 'start', settings: S.settingsFrom || 'start', transfer: 'settings', locked: 'map', trader: 'map', vending: 'map' }[S.screen];
+                 kitchen: 'base', meals: S.mealFrom, inv: S.inBase ? 'base' : 'map', liftmenu: 'map', help: S.helpFrom || 'start', settings: S.settingsFrom || 'start', transfer: 'settings', locked: 'map', trader: 'map', vending: 'map' }[S.screen];
   if (!back) return false;
   S.screen = back; render(); return true;
 }
@@ -1434,4 +1347,7 @@ try {
 
 // ---------- старт ----------
 initScene();
+$('btn-hl').onclick = () => { $('sv').classList.toggle('hl'); render(); };
+$('btn-fast').onclick = () => { walkMs = walkMs < 400 ? 520 : 260; try { localStorage.setItem('tower-fast', walkMs < 400 ? '1' : '0'); } catch (e) {} render(); };
+$('btn-set').onclick = () => { if (['map', 'base', 'start'].includes(S.screen)) openSettings(); };
 if (load()) { if (!S.lift && S.screen !== 'start') newFloor(); log('Игра загружена.'); render(); } else newGame();
