@@ -94,6 +94,7 @@ const PARTS = {
   arms: { n: 'Руки',   hit: 0.75, m: 0.8, eff: 'weak' },
   legs: { n: 'Ноги',   hit: 0.80, m: 0.8, eff: 'stag' },
 };
+const DIFFS = ['Легко', 'Нормально', 'Тяжело'];
 const PASSIVES = [
   { id: 'steady',  n: 'Стойкий',    t: '+20 макс. здоровья, -4 макс. энергии', req: 0 },
   { id: 'first',   n: 'Опережение', t: 'Первый удар в бою: ×1.3 урона и не промахивается', req: 0 },
@@ -141,7 +142,7 @@ const NOTES = [
   'Башню строили для тех, кто хотел жить высоко. Никто не подумал о тех, кто останется внизу.',
   'Крыша — не конец. Это окно.',
 ];
-const ROOM_WEIGHTS = { loot: 26, enemy: 26, rest: 8, trap: 8, trader: 5, event: 10, vending: 10, empty: 7 };
+const ROOM_WEIGHTS = { loot: 26, enemy: 26, rest: 8, trap: 8, trader: 5, event: 10, vending: 10, empty: 7, locked: 8 };
 const ROOM_HINTS = {
   loot:   ['Пахнет машинным маслом.', 'Из-под двери тянет затхлостью склада.', 'Слышен звон металла.'],
   enemy:  ['Из-за двери слышно рычание.', 'На полу свежие следы.', 'Кто-то тяжело дышит внутри.'],
@@ -150,6 +151,7 @@ const ROOM_HINTS = {
   trader: ['Слышны голоса и звон монет.', 'Над дверью висит самодельная вывеска.'],
   event:  ['Дверь приоткрыта. Тишина.', 'Из комнаты играет радио.'],
   empty:  ['Ничем не пахнет.', 'Дверь заперта изнутри — или так кажется.'],
+  locked:  ['Дверь заперта на тяжёлый замок.', 'Замочная скважина блестит: ею часто пользовались.', 'Из-за запертой двери тянет теплом.'],
   vending: ['Слышно гудение холодильника.', 'За дверью мигает неоновая вывеска.', 'Пахнет жжёным пластиком и сладким.'],
 };
 
@@ -200,7 +202,7 @@ setMuted(muted);
 
 // ---------- мета-прогресс и достижения ----------
 const META_KEY = 'tower-meta-v1';
-const meta = { ach: {}, wins: 0, ngWins: 0, bestFloor: 0, sel: { p: null, a: null } };
+const meta = { ach: {}, wins: 0, ngWins: 0, bestFloor: 0, diff: 1, sel: { p: null, a: null } };
 try { Object.assign(meta, JSON.parse(localStorage.getItem(META_KEY)) || {}); } catch (e) {}
 const saveMeta = () => { try { localStorage.setItem(META_KEY, JSON.stringify(meta)); } catch (e) {} };
 const ACHS = [
@@ -214,6 +216,8 @@ const ACHS = [
   { id: 'vend',    n: 'Постоянный клиент', t: 'Купи 5 товаров в автоматах',      ok: () => S.vendBuys >= 5 },
   { id: 'cook',    n: 'Шеф',               t: 'Приготовь 5 блюд',                ok: () => S.cooked >= 5 },
   { id: 'sleep',   n: 'Крепкий сон',       t: 'Выспись в убежище 3 раза',        ok: () => S.sleeps >= 3 },
+  { id: 'locked',  n: 'Взломщик',          t: 'Открой 3 запертые комнаты',       ok: () => S.opened >= 3 },
+  { id: 'hard',    n: 'Без поблажек',      t: 'Пройди башню на сложности «Тяжело»', ok: () => meta.hardWins >= 1 },
   { id: 'lvl5',    n: 'Закалка',           t: 'Достигни 5 уровня',               ok: () => S.lvl >= 5 },
   { id: 'lvl10',   n: 'Ветеран',           t: 'Достигни 10 уровня',              ok: () => S.lvl >= 10 },
   { id: 'perks6',  n: 'Мастер на все руки', t: 'Собери все 6 перков',            ok: () => S.perks.length >= PERKS.length },
@@ -243,7 +247,7 @@ const base = () => ({
   enemy: null, defending: false, trader: null, event: null, over: false,
   perks: [], pendingPerks: 0, perkChoices: [], notes: [], freeUsed: false,
   kills: 0, grenadeUsed: false, cycle: 0, lift: null, vend: null, repairs: 0, vendBuys: 0,
-  skills: { dex: 0, str: 0, spd: 0, acc: 0 }, sp: 0, bench: 1, kitchen: 1, passive: null, active: null, activeUsed: false, freeSteps: 0, luckTurns: 0, firstStrike: false,
+  keys: 0, diff: 1, lockIdx: -1, opened: 0, skills: { dex: 0, str: 0, spd: 0, acc: 0 }, sp: 0, bench: 1, kitchen: 1, passive: null, active: null, activeUsed: false, freeSteps: 0, luckTurns: 0, firstStrike: false,
   meat: 0, herbs: 0, dish: { roast: 0, broth: 0, tea: 0, stew: 0 }, inBase: false, stunned: false, cooked: 0, sleeps: 0, mealFrom: 'map',
 });
 const has = id => S.perks.includes(id);
@@ -254,7 +258,7 @@ function newGamePlus() {
   Object.assign(S, { cycle: c, lvl: p.lvl, xp: p.xp, maxHp: p.maxHp, maxEn: p.maxEn, perks: p.perks.slice(),
                      wi: p.wi, ai: p.ai, bonusDmg: p.bonusDmg, notes: p.notes.slice(),
                      skills: Object.assign({}, p.skills), sp: p.sp, bench: p.bench, kitchen: p.kitchen,
-                     passive: p.passive, active: p.active });
+                     passive: p.passive, active: p.active, diff: p.diff });
   S.hp = S.maxHp; S.en = S.maxEn;
   $('log').innerHTML = '';
   log(`Крыша оказалась окном. За ним снова лестница вниз, и башня стала другой. <b>Круг ${c + 1}</b>: враги крепче и бьют сильнее.`, 'story');
@@ -275,6 +279,8 @@ function startRun() {
   const okP = PASSIVES.find(p => p.id === meta.sel.p && unlockedAt(p.req));
   const okA = ACTIVES.find(p => p.id === meta.sel.a && unlockedAt(p.req));
   S.passive = okP ? okP.id : null; S.active = okA ? okA.id : null; S.activeUsed = false;
+  S.diff = meta.diff;
+  if (S.diff === 0) { S.food += 2; S.meds += 1; }
   if (S.passive === 'steady') { S.maxHp += 20; S.hp += 20; S.maxEn -= 4; S.en -= 4; }
   $('log').innerHTML = '';
   log('Ты приходишь в себя у подножия башни. Лифты сломаны, но их можно починить. Единственный путь — вверх, этаж за этажом.', 'story');
@@ -331,8 +337,13 @@ function newFloor() {
 function openRoom(i) {
   const r = S.rooms[i];
   if (S.screen !== 'map' || r.done) return;
+  if (r.type === 'locked' && S.keys <= 0) {
+    S.lockIdx = i; S.screen = 'locked';
+    log('Дверь заперта. Нужен ключ 🔑, или можно попробовать выбить её.'); render(); save(); return;
+  }
   if (!spendEnergy(1)) return;
   switch (r.type) {
+    case 'locked': r.done = true; S.keys--; lootRich(); break;
     case 'loot': {
       r.done = true;
       const s = rnd(1, 3) + Math.floor(S.floor / 12) + (has('scav') ? 1 : 0) + (S.passive === 'hoarder' ? 2 : 0);
@@ -342,6 +353,7 @@ function openRoom(i) {
       if (chance(0.45)) { S.food++; msg += ', 🍖'; }
       if (chance(0.4)) { const h = rnd(1, 2); S.herbs += h; msg += `, ${h}🌿`; }
       if (chance(0.15)) { S.meds++; msg += ', 🩹'; }
+      if (chance(0.15)) { S.keys++; msg += ', 🔑'; }
       if (chance(0.2)) {
         const left = NOTES.map((_, i) => i).filter(i => !S.notes.includes(i));
         if (left.length) { S.notes.push(pick(left)); msg += ', 📖 заметка'; }
@@ -370,6 +382,32 @@ function openRoom(i) {
   render(); save();
 }
 
+function lootRich() {
+  const s = rnd(3, 6) + Math.floor(S.floor / 8) + (S.passive === 'hoarder' ? 2 : 0);
+  const c = rnd(1, 3), ch = rnd(1, 3);
+  S.scrap += s; S.cloth += c; S.chem += ch; S.opened++;
+  let msg = `${s}🔩, ${c}🧵, ${ch}🧪`;
+  if (chance(0.6)) { S.medkit++; msg += ', 💉'; }
+  if (chance(0.4)) { S.grenade++; msg += ', 💣'; }
+  if (chance(0.4)) { S.food++; msg += ', 🍖'; }
+  if (chance(0.3)) {
+    const left = NOTES.map((_, i) => i).filter(i => !S.notes.includes(i));
+    if (left.length) { S.notes.push(pick(left)); msg += ', 📖 заметка'; }
+  }
+  log(`Запертая комната. Внутри: ${msg}.`, 'good'); sfx('pickup');
+}
+function forceDoor() {
+  if (S.screen !== 'locked') return;
+  const r = S.rooms[S.lockIdx];
+  if (!spendEnergy(3)) return;
+  if (chance(0.5)) { r.done = true; S.screen = 'map'; log('Дверь поддалась!', 'good'); lootRich(); }
+  else {
+    const d = 3 + Math.floor(S.floor / 10);
+    S.hp -= d; log(`Дверь не поддаётся, ты ушибся: -${d} здоровья.`, 'bad'); sfx('hurt'); vib(40);
+    if (checkDeath()) return;
+  }
+  render(); save();
+}
 const repairCost = () => Object.assign({ scrap: 2 + Math.floor(S.floor / 3) },
   S.floor >= 20 ? { chem: 1 + Math.floor((S.floor - 20) / 15) } : {});
 
@@ -567,6 +605,7 @@ const VEND = [
   { n: 'Химикаты ×2',         give: { chem: 2 },   cost: 5 },
   { n: 'Травы ×2',            give: { herbs: 2 },  cost: 3 },
   { n: 'Мясо',                give: { meat: 1 },   cost: 4 },
+  { n: 'Ключ',                give: { keys: 1 },   cost: 6 },
 ];
 function giveItems(give) {
   Object.entries(give).forEach(([k, v]) => S[k] += v);
@@ -665,9 +704,12 @@ function eventChoice(i) {
 function spawnEnemy() {
   const e = Object.assign({}, pick(ENEMIES[zoneOf(S.floor)]));
   const k = S.floor - 1;
-  e.hp = Math.round(e.hp * (1 + k * 0.065));
-  e.d = [Math.max(1, Math.round(e.d[0] * (1 + k * 0.04))), Math.max(1, Math.round(e.d[1] * (1 + k * 0.04)))];
-  e.xp = Math.round(e.xp * (1 + k * 0.04));
+  e.hp = Math.round(e.hp * (1 + k * 0.075));
+  e.d = [Math.max(1, Math.round(e.d[0] * (1 + k * 0.045))), Math.max(1, Math.round(e.d[1] * (1 + k * 0.045)))];
+  e.xp = Math.round(e.xp * (1 + k * 0.045));
+  const dm = [0.8, 1, 1.25][S.diff], xm = [0.9, 1, 1.2][S.diff];
+  e.hp = Math.round(e.hp * dm); e.xp = Math.round(e.xp * xm);
+  e.d = [Math.max(1, Math.round(e.d[0] * dm)), Math.max(1, Math.round(e.d[1] * dm))];
   return e;
 }
 function startFight(e) {
@@ -783,6 +825,7 @@ function victory() {
   if (chance(0.3)) { S.cloth++; msg += ', 🧵'; }
   if (chance(0.25)) { S.chem++; msg += ', 🧪'; }
   if (chance(0.3)) { S.food++; msg += ', 🍖'; }
+  if (chance(0.12)) { S.keys++; msg += ', 🔑'; }
   if (e.beast && chance(0.6)) { const m = rnd(1, 2); S.meat += m; msg += `, ${m}🥩`; }
   log(`${e.n} повержен. Добыча: ${msg}.`, 'good');
   gainXp(e.xp);
@@ -824,7 +867,7 @@ function checkDeath() {
 }
 function win() {
   S.over = true; S.screen = 'win'; best = TOP; meta.bestFloor = TOP;
-  meta.wins++; if (S.cycle >= 1) meta.ngWins++; saveMeta(); sfx('win'); vib([60, 40, 60, 40, 200]);
+  meta.wins++; if (S.cycle >= 1) meta.ngWins++; if (S.diff === 2) meta.hardWins = (meta.hardWins || 0) + 1; saveMeta(); sfx('win'); vib([60, 40, 60, 40, 200]);
   log('<b>Сотый этаж. Ты выходишь на крышу и впервые за долгое время видишь небо.</b>', 'good');
   render(); save();
 }
@@ -860,7 +903,7 @@ function render() {
   $('t-xp').textContent = `${S.xp}/${S.lvl * 20}`;
   $('inv').innerHTML =
     `<span>🔩${S.scrap}</span><span>🧵${S.cloth}</span><span>🧪${S.chem}</span><span>🥩${S.meat}</span><span>🌿${S.herbs}</span>` +
-    `<span>💣${S.grenade}</span><span>⚔️ ${weapon().n}</span><span>🛡️ ${armor().n}</span>` + (S.poison ? '<span style="color:var(--hp)">☠️ яд</span>' : '');
+    `<span>🔑${S.keys}</span><span>💣${S.grenade}</span><span>⚔️ ${weapon().n}</span><span>🛡️ ${armor().n}</span>` + (S.poison ? '<span style="color:var(--hp)">☠️ яд</span>' : '');
 
   const a = $('actions'); a.innerHTML = '';
   switch (S.screen) {
@@ -891,6 +934,7 @@ function render() {
       a.appendChild(btn(`⭐ Навыки${S.sp ? ' (' + S.sp + ')' : ''}`, () => { S.screen = 'skills'; render(); }, S.sp ? 'primary' : ''));
       break;
     case 'start':
+      a.appendChild(btn(`Сложность: ${DIFFS[meta.diff]} (нажми, чтобы сменить)`, () => { meta.diff = (meta.diff + 1) % 3; saveMeta(); render(); }, 'full primary'));
       head(a, 'Пассивный перк (действует весь забег). Нажми ещё раз, чтобы снять:');
       PASSIVES.forEach(p => a.appendChild(unlockedAt(p.req)
         ? btn(`${meta.sel.p === p.id ? '✔ ' : ''}${p.n} — ${p.t}`, () => toggleSel('p', p.id), 'full' + (meta.sel.p === p.id ? ' primary' : ''))
@@ -963,6 +1007,11 @@ function render() {
       a.appendChild(btn('← Назад', () => { S.screen = S.inBase ? 'base' : 'map'; render(); }, 'full'));
       break;
     }
+    case 'locked':
+      head(a, `Запертая дверь. Ключей: ${S.keys}🔑.`);
+      a.appendChild(btn('💪 Выбить дверь (-3 энергии, шанс 50%, при неудаче ушиб)', forceDoor, 'full primary'));
+      a.appendChild(btn('Уйти', () => { S.screen = 'map'; render(); }, 'full'));
+      break;
     case 'vending':
       head(a, `Автомат. У тебя 🔩${S.scrap}`);
       S.vend.stock.forEach((g, i) => a.appendChild(btn(g.sold ? `${g.n} — продано` : `${g.n} — ${g.cost}🔩`, () => buyVend(i), '', g.sold || S.scrap < g.cost)));
@@ -998,7 +1047,7 @@ function render() {
 }
 function roomName(t) {
   return { loot: 'Склад', enemy: 'Логово', rest: 'Убежище', trap: 'Ловушка', trader: 'Торговец',
-           event: 'Происшествие', empty: 'Пусто', vending: 'Автомат' }[t];
+           event: 'Происшествие', empty: 'Пусто', vending: 'Автомат', locked: 'Запертая комната' }[t];
 }
 
 // ---------- старт ----------

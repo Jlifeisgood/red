@@ -13,8 +13,42 @@ jobs:
         with: { distribution: temurin, java-version: 21 }
       - run: npm ci
       - run: npx cap sync android
-      - run: cd android && chmod +x gradlew && ./gradlew assembleDebug
+
+      # Постоянный ключ берётся из секретов репозитория:
+      #   ANDROID_KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD
+      # Если секретов нет, создаётся временный ключ: APK подписан и устанавливается,
+      # но обновить поверх него сборку с другим ключом нельзя.
+      - name: Prepare signing key
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KS_KEYPASS: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          KS="$RUNNER_TEMP/release.jks"
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > "$KS"
+            PASS="$KS_PASS"; ALIAS="$KS_ALIAS"; KEYPASS="${KS_KEYPASS:-$KS_PASS}"
+            echo "Using the permanent key from repository secrets."
+          else
+            PASS="$(openssl rand -hex 16)"; ALIAS="tower"; KEYPASS="$PASS"
+            keytool -genkeypair -v -keystore "$KS" -storetype PKCS12 -alias "$ALIAS" \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass "$PASS" -keypass "$PASS" -dname "CN=Tower Game, O=Tower, C=US"
+            echo "::warning::No signing secrets found: signed with a TEMPORARY key. Add ANDROID_KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD secrets for a permanent key."
+          fi
+          echo "::add-mask::$PASS"; echo "::add-mask::$KEYPASS"
+          {
+            echo "KEYSTORE_FILE=$KS"; echo "KEYSTORE_PASSWORD=$PASS"
+            echo "KEY_ALIAS=$ALIAS";  echo "KEY_PASSWORD=$KEYPASS"
+          } >> "$GITHUB_ENV"
+
+      - run: cd android && chmod +x gradlew && ./gradlew assembleRelease
+      - name: Verify signature
+        run: |
+          APKSIGNER="$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)"
+          "$APKSIGNER" verify --verbose --print-certs android/app/build/outputs/apk/release/app-release.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: tower-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: tower-release-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
