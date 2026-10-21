@@ -18,26 +18,47 @@ const zoneOf = f => Math.min(4, Math.floor((f - 1) / 20));
 const tierOf = f => f <= 34 ? 0 : f <= 68 ? 1 : 2;
 const TIER_START = [0, 34, 68];
 
+// Базовые характеристики; с этажом hp, урон и опыт растут (см. spawnEnemy).
+// Особенности: armored, poison, regen, thorns, drain, dodge, enrage, stun, multi, beast (даёт мясо).
 const ENEMIES = [
-  [ { n: 'Крыса-переросток', hp: 10, d: [2, 3], xp: 5 },
+  [ // Подвалы
+    { n: 'Крыса-переросток', hp: 9,  d: [1, 2], xp: 5,  beast: true, multi: true },
+    { n: 'Бродячий пёс',     hp: 12, d: [2, 3], xp: 6,  beast: true, dodge: true },
+    { n: 'Сборщик',          hp: 13, d: [2, 3], xp: 7,  poison: true },
+    { n: 'Слизень',          hp: 16, d: [1, 3], xp: 7,  regen: true },
+    { n: 'Ржавый дрон',      hp: 12, d: [2, 3], xp: 8,  armored: true } ],
+  [ // Жилые этажи
+    { n: 'Одичавший сосед',  hp: 15, d: [2, 4], xp: 8,  enrage: true },
+    { n: 'Кошка-мутант',     hp: 12, d: [2, 3], xp: 8,  beast: true, dodge: true, poison: true },
     { n: 'Мародёр',          hp: 14, d: [2, 4], xp: 7 },
-    { n: 'Ржавый дрон',      hp: 12, d: [3, 4], xp: 8, armored: true },
-    { n: 'Скиталец',         hp: 16, d: [3, 5], xp: 9 },
-    { n: 'Бродячий пёс',     hp: 11, d: [2, 4], xp: 6 },
-    { n: 'Сборщик',          hp: 15, d: [3, 4], xp: 8, poison: true } ],
-  [ { n: 'Охотник',          hp: 26, d: [5, 8], xp: 16 },
-    { n: 'Мутант',           hp: 32, d: [6, 9], xp: 20, poison: true },
-    { n: 'Охранный робот',   hp: 30, d: [6, 8], xp: 18, armored: true },
-    { n: 'Культист',         hp: 24, d: [5, 9], xp: 15, poison: true },
-    { n: 'Тюремщик',         hp: 34, d: [6, 8], xp: 19, armored: true },
-    { n: 'Ползун',           hp: 28, d: [5, 8], xp: 17, poison: true } ],
-  [ { n: 'Страж',            hp: 45, d: [9, 13],  xp: 30 },
-    { n: 'Химера',           hp: 52, d: [10, 14], xp: 36, poison: true },
-    { n: 'Дрон-палач',       hp: 48, d: [10, 12], xp: 34, armored: true },
-    { n: 'Тень',             hp: 40, d: [9, 15],  xp: 32, poison: true },
-    { n: 'Часовой',          hp: 50, d: [10, 13], xp: 35, armored: true },
-    { n: 'Наместник',        hp: 46, d: [9, 14],  xp: 33 } ],
+    { n: 'Ползун',           hp: 14, d: [2, 3], xp: 8,  beast: true, poison: true },
+    { n: 'Скиталец',         hp: 16, d: [2, 4], xp: 9,  drain: true } ],
+  [ // Офисы
+    { n: 'Охранный робот',   hp: 16, d: [2, 4], xp: 9,  armored: true },
+    { n: 'Дрон-наблюдатель', hp: 12, d: [2, 3], xp: 9,  drain: true, dodge: true },
+    { n: 'Сотрудник',        hp: 15, d: [2, 4], xp: 9,  stun: true },
+    { n: 'Турникет-страж',   hp: 18, d: [2, 3], xp: 9,  thorns: true, armored: true },
+    { n: 'Менеджер',         hp: 14, d: [3, 4], xp: 10, enrage: true } ],
+  [ // Лаборатории
+    { n: 'Подопытный',       hp: 18, d: [2, 4], xp: 10, beast: true, enrage: true },
+    { n: 'Мутант',           hp: 18, d: [2, 4], xp: 10, beast: true, poison: true, regen: true },
+    { n: 'Лаборант-культист', hp: 14, d: [2, 4], xp: 10, stun: true, poison: true },
+    { n: 'Дрон-палач',       hp: 17, d: [2, 4], xp: 10, armored: true, thorns: true },
+    { n: 'Химера',           hp: 20, d: [2, 4], xp: 11, beast: true, multi: true } ],
+  [ // Пентхаус
+    { n: 'Страж',            hp: 18, d: [2, 4], xp: 11, armored: true },
+    { n: 'Наместник',        hp: 17, d: [3, 5], xp: 12, enrage: true, stun: true },
+    { n: 'Тень',             hp: 15, d: [3, 4], xp: 12, dodge: true, drain: true },
+    { n: 'Элитный дрон',     hp: 19, d: [2, 4], xp: 12, armored: true, regen: true },
+    { n: 'Королевская химера', hp: 21, d: [2, 4], xp: 13, beast: true, multi: true, poison: true } ],
 ];
+const TRAITS = {
+  armored: ['🛡', 'броня'], poison: ['☠', 'яд'], regen: ['♻', 'регенерация'], thorns: ['🌵', 'шипы'],
+  drain: ['⚡', 'тянет энергию'], dodge: ['💨', 'увёртлив'], enrage: ['😡', 'свирепеет при ранах'],
+  stun: ['💫', 'оглушает'], multi: ['⚔⚔', 'два удара'],
+};
+const traitIcons = e => Object.keys(TRAITS).filter(k => e[k]).map(k => TRAITS[k][0]).join('');
+const traitText = e => { const t = Object.keys(TRAITS).filter(k => e[k]).map(k => TRAITS[k][1]); return t.length ? ' — ' + t.join(', ') : ''; };
 
 const WEAPONS = [
   { n: 'Кулаки', d: 0 },
@@ -62,7 +83,7 @@ const RECIPES = {
   stim:    { n: 'Стимулятор',   c: { chem: 3, scrap: 1 } },
   grenade: { n: 'Граната',      c: { chem: 2, scrap: 2 } },
 };
-const RES_ICON = { scrap: '🔩', cloth: '🧵', chem: '🧪', food: '🍖', meds: '🩹', medkit: '💉', stim: '⚡', grenade: '💣' };
+const RES_ICON = { meat: '🥩', herbs: '🌿', scrap: '🔩', cloth: '🧵', chem: '🧪', food: '🍖', meds: '🩹', medkit: '💉', stim: '⚡', grenade: '💣' };
 const costText = c => Object.entries(c).map(([k, v]) => `${v}${RES_ICON[k]}`).join(' ');
 const canPay = c => Object.entries(c).every(([k, v]) => S[k] >= v);
 const pay = c => Object.entries(c).forEach(([k, v]) => S[k] -= v);
@@ -160,6 +181,8 @@ const ACHS = [
   { id: 'floor80', n: 'Над облаками',      t: 'Дойди до 81 этажа',               ok: () => S.floor >= 81 },
   { id: 'lift',    n: 'Лифтёр',            t: 'Почини 5 лифтов',                 ok: () => S.repairs >= 5 },
   { id: 'vend',    n: 'Постоянный клиент', t: 'Купи 5 товаров в автоматах',      ok: () => S.vendBuys >= 5 },
+  { id: 'cook',    n: 'Шеф',               t: 'Приготовь 5 блюд',                ok: () => S.cooked >= 5 },
+  { id: 'sleep',   n: 'Крепкий сон',       t: 'Выспись в убежище 3 раза',        ok: () => S.sleeps >= 3 },
   { id: 'lvl5',    n: 'Закалка',           t: 'Достигни 5 уровня',               ok: () => S.lvl >= 5 },
   { id: 'lvl10',   n: 'Ветеран',           t: 'Достигни 10 уровня',              ok: () => S.lvl >= 10 },
   { id: 'perks6',  n: 'Мастер на все руки', t: 'Собери все 6 перков',            ok: () => S.perks.length >= PERKS.length },
@@ -189,6 +212,7 @@ const base = () => ({
   enemy: null, defending: false, trader: null, event: null, over: false,
   perks: [], pendingPerks: 0, perkChoices: [], notes: [], freeUsed: false,
   kills: 0, grenadeUsed: false, cycle: 0, lift: null, vend: null, repairs: 0, vendBuys: 0,
+  meat: 0, herbs: 0, dish: { roast: 0, broth: 0, tea: 0, stew: 0 }, inBase: false, stunned: false, cooked: 0, sleeps: 0, mealFrom: 'map',
 });
 const has = id => S.perks.includes(id);
 
@@ -245,7 +269,7 @@ function hintFor(type) {
 }
 
 function newFloor() {
-  S.screen = 'map'; S.enemy = null; S.vend = null;
+  S.screen = 'map'; S.enemy = null; S.vend = null; S.inBase = false;
   S.rooms = Array.from({ length: 3 }, () => {
     const type = weightedRoom();
     return { type, done: false, hint: hintFor(type) };
@@ -267,6 +291,7 @@ function openRoom(i) {
       if (chance(0.5)) { const c = rnd(1, 2); S.cloth += c; msg += `, ${c}🧵`; }
       if (chance(0.3)) { const c = rnd(1, 2); S.chem += c; msg += `, ${c}🧪`; }
       if (chance(0.45)) { S.food++; msg += ', 🍖'; }
+      if (chance(0.4)) { const h = rnd(1, 2); S.herbs += h; msg += `, ${h}🌿`; }
       if (chance(0.15)) { S.meds++; msg += ', 🩹'; }
       if (chance(0.2)) {
         const left = NOTES.map((_, i) => i).filter(i => !S.notes.includes(i));
@@ -392,6 +417,58 @@ function buy(i) {
   log(`Куплено: ${g.n}.`, 'good'); render(); save();
 }
 
+// ---------- убежище и кухня ----------
+const DISHES = {
+  roast: { n: 'Жаркое',       c: { meat: 2, herbs: 1 }, t: '+16 энергии' },
+  broth: { n: 'Бульон',       c: { meat: 1, food: 1 },  t: '+35% здоровья, +6 энергии' },
+  tea:   { n: 'Травяной чай', c: { herbs: 2 },          t: 'снимает яд, +4 энергии' },
+  stew:  { n: 'Рагу',         c: { herbs: 2, food: 1 }, t: '+12 энергии, +5 здоровья' },
+};
+const totalDishes = () => Object.values(S.dish).reduce((a, b) => a + b, 0);
+const returnCost = () => Math.max(1, Math.ceil(S.floor / 25));
+
+function goBase() {
+  if (S.screen !== 'map' || !S.lift || S.lift.state !== 'ok') return;
+  if (!spendEnergy(1)) return;
+  S.inBase = true; S.screen = 'base';
+  log('Ты спускаешься на исправном лифте в убежище. Здесь тихо, есть койка и плита.', 'story');
+  render(); save();
+}
+function returnUp() {
+  if (S.screen !== 'base') return;
+  if (!spendEnergy(returnCost())) return;
+  S.inBase = false; S.screen = 'map';
+  log(`Ты возвращаешься на этаж ${S.floor}.`);
+  sfx('stairs'); render(); save();
+}
+function sleep() {
+  if (S.screen !== 'base' || S.en < 6) return;
+  S.en -= 6; S.hp = S.maxHp; S.poison = 0; S.stunned = false; S.sleeps++;
+  log('Ты спишь несколько часов. Здоровье восстановлено (-6 энергии).', 'good'); sfx('pickup');
+  if (S.floor >= 10 && chance(0.15)) {
+    log('Среди ночи что-то шевелится в темноте!', 'bad');
+    return startFight(spawnEnemy());
+  }
+  render(); save();
+}
+function cook(id) {
+  const d = DISHES[id];
+  if (S.screen !== 'kitchen' || !canPay(d.c)) return;
+  pay(d.c); S.dish[id]++; S.cooked++;
+  log(`Готово: ${d.n}.`, 'good'); sfx('pickup'); render(); save();
+}
+function openMeals() { S.mealFrom = S.screen; S.screen = 'meals'; render(); }
+function eatDish(id) {
+  if (!S.dish[id]) return;
+  S.dish[id]--;
+  if (id === 'roast') { S.en = Math.min(S.maxEn, S.en + 16); log('Жаркое: +16 энергии.', 'good'); }
+  else if (id === 'broth') { const h = Math.round(S.maxHp * 0.35); S.hp = Math.min(S.maxHp, S.hp + h); S.en = Math.min(S.maxEn, S.en + 6); log(`Бульон: +${h} здоровья, +6 энергии.`, 'good'); }
+  else if (id === 'tea') { S.poison = 0; S.en = Math.min(S.maxEn, S.en + 4); log('Чай: яд снят, +4 энергии.', 'good'); }
+  else if (id === 'stew') { S.en = Math.min(S.maxEn, S.en + 12); S.hp = Math.min(S.maxHp, S.hp + 5); log('Рагу: +12 энергии, +5 здоровья.', 'good'); }
+  S.screen = S.mealFrom;
+  if (S.screen === 'fight') enemyTurn(); else { render(); save(); }
+}
+
 // ---------- вендинговые автоматы ----------
 const VEND = [
   { n: 'Паёк',                give: { food: 1 },   cost: 2 },
@@ -402,6 +479,8 @@ const VEND = [
   { n: 'Аптечка',             give: { medkit: 1 }, cost: 6 },
   { n: 'Ткань ×2',            give: { cloth: 2 },  cost: 3 },
   { n: 'Химикаты ×2',         give: { chem: 2 },   cost: 5 },
+  { n: 'Травы ×2',            give: { herbs: 2 },  cost: 3 },
+  { n: 'Мясо',                give: { meat: 1 },   cost: 4 },
 ];
 function giveItems(give) {
   Object.entries(give).forEach(([k, v]) => S[k] += v);
@@ -498,12 +577,11 @@ function eventChoice(i) {
 
 // ---------- бой ----------
 function spawnEnemy() {
-  const tier = tierOf(S.floor), local = S.floor - 1 - TIER_START[tier];
-  const m = 1 + local * 0.06, md = 1 + local * 0.04;
-  const e = Object.assign({}, pick(ENEMIES[tier]));
-  e.hp = Math.round(e.hp * m);
-  e.d = [Math.round(e.d[0] * md), Math.round(e.d[1] * md)];
-  e.xp = Math.round(e.xp * m);
+  const e = Object.assign({}, pick(ENEMIES[zoneOf(S.floor)]));
+  const k = S.floor - 1;
+  e.hp = Math.round(e.hp * (1 + k * 0.065));
+  e.d = [Math.max(1, Math.round(e.d[0] * (1 + k * 0.04))), Math.max(1, Math.round(e.d[1] * (1 + k * 0.04)))];
+  e.xp = Math.round(e.xp * (1 + k * 0.04));
   return e;
 }
 function startFight(e) {
@@ -514,17 +592,18 @@ function startFight(e) {
     e.xp = Math.round(e.xp * (1 + 0.3 * c));
   }
   e.maxHp = e.hp; S.enemy = e; S.screen = 'fight'; S.defending = false; S.freeUsed = false;
-  log(`Перед тобой <span class="enemy">${e.n}</span> (${e.hp} HP)!`);
+  log(`Перед тобой <span class="enemy">${e.n}</span> (${e.hp} HP)${traitText(e)}!`);
   render(); save();
 }
 function playerDamage(mult = 1) {
   let d = Math.round((rnd(2, 4) + weapon().d + S.lvl + S.bonusDmg) * mult);
-  if (S.enemy.armored) d = Math.max(1, d - 2);
+  if (S.enemy.armored) d = Math.max(1, d - Math.max(2, Math.round(d * 0.15)));
   return d;
 }
 function attack(heavy) {
+  if (S.stunned) { S.stunned = false; S.defending = false; log('Ты оглушён и теряешь ход.', 'bad'); return enemyTurn(); }
   if (heavy) { if (S.en < 2) return; S.en -= 2; }
-  const hit = heavy ? 0.7 : 0.9;
+  const hit = (heavy ? 0.7 : 0.9) - (S.enemy.dodge ? 0.15 : 0);
   if (!chance(hit)) log('Ты промахиваешься.');
   else {
     let d = playerDamage(heavy ? 1.8 : 1);
@@ -532,6 +611,11 @@ function attack(heavy) {
     if (crit) d *= 2;
     S.enemy.hp -= d; log(`${crit ? 'Критический удар! ' : ''}Ты бьёшь: <b>${d}</b> урона.`);
     sfx(crit ? 'crit' : 'hit'); if (crit) vib(60);
+    if (S.enemy.thorns) {
+      const t = 2 + Math.floor(S.floor / 20);
+      S.hp -= t; log(`Шипы ранят тебя: -${t}.`, 'bad');
+      if (checkDeath()) return;
+    }
   }
   if (S.enemy.hp <= 0) return victory();
   S.defending = false; enemyTurn();
@@ -546,19 +630,31 @@ function defend() { S.defending = true; log('Ты прикрываешься.');
 function flee() {
   if (chance(0.5)) {
     log('Ты удираешь.', 'good');
-    S.enemy = null; S.screen = 'map'; S.defending = false;
+    S.enemy = null; S.screen = S.inBase ? 'base' : 'map'; S.defending = false;
     if (!spendEnergy(2)) return;
     render(); save();
   } else { log('Сбежать не удалось!', 'bad'); S.defending = false; enemyTurn(); }
 }
 function enemyTurn() {
   const e = S.enemy;
-  let dmg = Math.max(1, rnd(e.d[0], e.d[1]) - defArmor());
-  if (S.defending) dmg = Math.ceil(dmg / 2);
-  S.hp -= dmg;
-  log(`<span class="enemy">${e.n}</span> наносит <b>${dmg}</b> урона.`, 'bad');
+  if (e.regen && e.hp < e.maxHp) {
+    const h = Math.max(1, Math.round(e.maxHp * 0.08));
+    e.hp = Math.min(e.maxHp, e.hp + h); log(`${e.n} восстанавливается: +${h}.`);
+  }
+  const hits = e.multi ? 2 : 1;
+  for (let i = 0; i < hits; i++) {
+    let raw = rnd(e.d[0], e.d[1]);
+    if (e.enrage && e.hp < e.maxHp * 0.5) raw = Math.round(raw * 1.3);
+    if (hits > 1) raw = Math.max(1, Math.round(raw * 0.6));
+    let dmg = Math.max(1, raw - defArmor());
+    if (S.defending) dmg = Math.ceil(dmg / 2);
+    S.hp -= dmg;
+    log(`<span class="enemy">${e.n}</span> наносит <b>${dmg}</b> урона.`, 'bad');
+  }
   sfx('hurt'); vib(40);
   if (e.poison && !S.defending && chance(0.35) && !S.poison) { S.poison = 3; log('Ты отравлен!', 'bad'); }
+  if (e.stun && !S.defending && chance(0.2)) { S.stunned = true; log('Удар оглушил тебя: следующая атака пропадёт!', 'bad'); }
+  if (e.drain && chance(0.5)) { S.en = Math.max(0, S.en - 2); log('Враг вытягивает силы: -2 энергии.', 'bad'); }
   S.defending = false;
   if (S.poison > 0) { const pd = has('stomach') ? 1 : 2; S.poison--; S.hp -= pd; log(`Яд: -${pd} здоровья.`, 'bad'); }
   if (checkDeath()) return;
@@ -572,9 +668,10 @@ function victory() {
   if (chance(0.3)) { S.cloth++; msg += ', 🧵'; }
   if (chance(0.25)) { S.chem++; msg += ', 🧪'; }
   if (chance(0.3)) { S.food++; msg += ', 🍖'; }
+  if (e.beast && chance(0.6)) { const m = rnd(1, 2); S.meat += m; msg += `, ${m}🥩`; }
   log(`${e.n} повержен. Добыча: ${msg}.`, 'good');
   gainXp(e.xp);
-  S.enemy = null; S.screen = 'map';
+  S.enemy = null; S.screen = S.inBase ? 'base' : 'map';
   render(); save();
 }
 
@@ -629,11 +726,12 @@ function consumableButtons(a) {
   a.appendChild(btn(`Бинт 🩹${S.meds}`, () => useItem('meds'), '', S.meds <= 0 || S.hp >= S.maxHp));
   a.appendChild(btn(`Аптечка 💉${S.medkit}`, () => useItem('medkit'), '', S.medkit <= 0 || (S.hp >= S.maxHp && !S.poison)));
   a.appendChild(btn(`Стим ⚡${S.stim}`, () => useItem('stim'), '', S.stim <= 0 || S.en >= S.maxEn));
+  a.appendChild(btn(`🍲 Блюда ${totalDishes()}`, openMeals, 'full', totalDishes() === 0));
 }
 
 function render() {
   checkAch();
-  $('floor').textContent = `Этаж ${S.floor} / ${TOP}`;
+  $('floor').textContent = S.inBase ? `Убежище (этаж ${S.floor})` : `Этаж ${S.floor} / ${TOP}`;
   $('zone').textContent = `${S.cycle ? 'Круг ' + (S.cycle + 1) + ' · ' : ''}${ZONES[zoneOf(S.floor)].name} · рекорд ${best || 1}`;
   $('b-hp').style.width = (S.hp / S.maxHp * 100) + '%';
   $('b-en').style.width = (S.en / S.maxEn * 100) + '%';
@@ -643,7 +741,7 @@ function render() {
   $('lvl').textContent = `Ур. ${S.lvl}`;
   $('t-xp').textContent = `${S.xp}/${S.lvl * 20}`;
   $('inv').innerHTML =
-    `<span>🔩${S.scrap}</span><span>🧵${S.cloth}</span><span>🧪${S.chem}</span>` +
+    `<span>🔩${S.scrap}</span><span>🧵${S.cloth}</span><span>🧪${S.chem}</span><span>🥩${S.meat}</span><span>🌿${S.herbs}</span>` +
     `<span>💣${S.grenade}</span><span>⚔️ ${weapon().n}</span><span>🛡️ ${armor().n}</span>` + (S.poison ? '<span style="color:var(--hp)">☠️ яд</span>' : '');
 
   const a = $('actions'); a.innerHTML = '';
@@ -665,6 +763,7 @@ function render() {
           a.appendChild(btn(`🛠 Починить лифт — ${costText(S.lift.cost)}`, repairLift, 'full primary', !canPay(S.lift.cost)));
           a.appendChild(btn('🪢 Лезть по тросу (-4 энергии, риск травмы)', climbRope, 'full'));
         }
+        if (S.lift.state === 'ok' && S.floor >= 3) a.appendChild(btn('🏠 Вниз, в убежище (-1 энергии)', goBase, 'full'));
       }
       head(a, 'Предметы');
       consumableButtons(a);
@@ -687,13 +786,31 @@ function render() {
       if (S.perks.length) head(a, 'Перки: ' + S.perks.map(id => PERKS.find(p => p.id === id).n).join(', '));
       a.appendChild(btn('← Назад', () => { S.screen = 'map'; render(); }, 'full'));
       break;
+    case 'base':
+      head(a, `Убежище. Койка, плита, верстак. Возврат на этаж ${S.floor}: -${returnCost()} энергии.`);
+      a.appendChild(btn('🛏 Спать (-6 энергии, полное здоровье)', sleep, 'full primary', S.en < 6));
+      a.appendChild(btn('🍳 Кухня', () => { S.screen = 'kitchen'; render(); }));
+      a.appendChild(btn('🛠 Мастерская', () => { S.screen = 'craft'; render(); }));
+      consumableButtons(a);
+      a.appendChild(btn(`⬆ Вернуться на этаж ${S.floor}`, returnUp, 'full primary'));
+      break;
+    case 'kitchen':
+      head(a, `Ингредиенты: 🥩${S.meat} 🌿${S.herbs} 🍖${S.food}. Блюд готово: ${totalDishes()}`);
+      Object.entries(DISHES).forEach(([id, d]) => a.appendChild(btn(`${d.n} — ${costText(d.c)} (${d.t}) ×${S.dish[id]}`, () => cook(id), 'full', !canPay(d.c))));
+      a.appendChild(btn('← Назад', () => { S.screen = 'base'; render(); }, 'full'));
+      break;
+    case 'meals':
+      head(a, 'Выбери блюдо:');
+      Object.entries(DISHES).forEach(([id, d]) => { if (S.dish[id] > 0) a.appendChild(btn(`${d.n} ×${S.dish[id]} — ${d.t}`, () => eatDish(id), 'full primary')); });
+      a.appendChild(btn('← Назад', () => { S.screen = S.mealFrom; render(); }, 'full'));
+      break;
     case 'craft': {
       head(a, `Материалы: 🔩${S.scrap} 🧵${S.cloth} 🧪${S.chem}`);
       const nw = WEAPONS[S.wi + 1], na = ARMORS[S.ai + 1];
       if (nw) a.appendChild(btn(`⚔️ ${nw.n} (+${nw.d}) — ${costText(nw.c)}`, () => craft('weapon', S.wi + 1), 'full', !canPay(nw.c)));
       if (na) a.appendChild(btn(`🛡️ ${na.n} (защита ${na.a}) — ${costText(na.c)}`, () => craft('armor', S.ai + 1), 'full', !canPay(na.c)));
       Object.entries(RECIPES).forEach(([k, r]) => a.appendChild(btn(`${RES_ICON[k]} ${r.n} — ${costText(r.c)}`, () => craft('res', k), 'full', !canPay(r.c))));
-      a.appendChild(btn('← Назад', () => { S.screen = 'map'; render(); }, 'full'));
+      a.appendChild(btn('← Назад', () => { S.screen = S.inBase ? 'base' : 'map'; render(); }, 'full'));
       break;
     }
     case 'vending':
@@ -712,7 +829,7 @@ function render() {
       break;
     case 'fight': {
       const e = S.enemy;
-      a.appendChild(btn(`${e.n}: ${Math.max(0, e.hp)}/${e.maxHp} HP`, () => {}, 'full danger', true));
+      a.appendChild(btn(`${e.n} ${traitIcons(e)}: ${Math.max(0, e.hp)}/${e.maxHp} HP`, () => {}, 'full danger', true));
       a.appendChild(btn('Атаковать', () => attack(false), 'primary'));
       a.appendChild(btn('Мощный удар (-2 эн.)', () => attack(true), 'primary', S.en < 2));
       a.appendChild(btn('Защита', defend));
