@@ -23,3 +23,5 @@ button.primary { border-color:var(--accent); } button.danger { border-color:var(
 button.full, .full { grid-column:1/-1; }
 .head { grid-column:1/-1; color:var(--dim); font-size:13px; padding:2px 4px; }
 .enemy { color:var(--hp); font-weight:600; }
+#mute { padding:2px 8px; font-size:16px; border-radius:8px; }
+#top { gap:8px; } #zone { flex:1; text-align:right; }
