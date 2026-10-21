@@ -271,7 +271,7 @@ const base = () => ({
   enemy: null, defending: false, trader: null, event: null, over: false,
   perks: [], pendingPerks: 0, perkChoices: [], notes: [], freeUsed: false,
   kills: 0, grenadeUsed: false, cycle: 0, lift: null, vend: null, repairs: 0, vendBuys: 0,
-  keys: 0, diff: 1, lockIdx: -1, opened: 0, quest: null, quests: 0, mercy: 0, greed: 0, skills: { dex: 0, str: 0, spd: 0, acc: 0 }, sp: 0, bench: 1, kitchen: 1, passive: null, active: null, activeUsed: false, freeSteps: 0, luckTurns: 0, firstStrike: false,
+  keys: 0, diff: 1, lockIdx: -1, opened: 0, helpFrom: 'start', quest: null, quests: 0, mercy: 0, greed: 0, skills: { dex: 0, str: 0, spd: 0, acc: 0 }, sp: 0, bench: 1, kitchen: 1, passive: null, active: null, activeUsed: false, freeSteps: 0, luckTurns: 0, firstStrike: false,
   meat: 0, herbs: 0, dish: { tea: 0, stew: 0, porridge: 0, bar: 0, roast: 0, soup: 0, pie: 0, antidote: 0, broth: 0, skewer: 0, feast: 0 }, inBase: false, stunned: false, cooked: 0, sleeps: 0, mealFrom: 'map',
 });
 const has = id => S.perks.includes(id);
@@ -981,6 +981,7 @@ const ENDINGS = {
   shadow: { n: 'Тень',      t: 'Ты стоишь на крыше один, зато с полным рюкзаком. Небо большое и пустое. Кажется, ты получил ровно то, за чем шёл.' },
   lone:   { n: 'Одиночка',  t: 'Ты просто сел на краю крыши и смотрел на рассвет. Дальше можно придумать что угодно.' },
 };
+const statsLine = () => `Итоги: этаж ${S.floor}, уровень ${S.lvl}, побеждено врагов ${S.kills}, починено лифтов ${S.repairs}, блюд приготовлено ${S.cooked}, записок ${S.notes.length}/${NOTES.length}.`;
 function pickEnding() {
   let id = 'lone';
   if (S.notes.length >= NOTES.length) id = 'scribe';
@@ -994,6 +995,7 @@ function checkDeath() {
   best = Math.max(best, S.floor);
   meta.bestFloor = Math.max(meta.bestFloor || 0, S.floor); saveMeta();
   log(`Ты погиб на этаже ${S.floor}.`, 'bad');
+  log(statsLine(), 'story');
   render(); save(); return true;
 }
 function win() {
@@ -1002,6 +1004,7 @@ function win() {
   const end = pickEnding(); meta.endings[end.id] = true; saveMeta();
   log('<b>Сотый этаж. Ты выходишь на крышу и впервые за долгое время видишь небо.</b>', 'good');
   log(`Концовка «${end.n}» (${Object.keys(meta.endings).length}/4): ${end.t}`, 'story');
+  log(statsLine(), 'story');
   render(); save();
 }
 
@@ -1066,6 +1069,7 @@ function render() {
       a.appendChild(btn(`📖 Дневник ${S.notes.length}/${NOTES.length}`, () => { S.screen = 'diary'; render(); }));
       a.appendChild(btn(`🏆 Достижения ${ACHS.filter(x => meta.ach[x.id]).length}/${ACHS.length}`, () => { S.screen = 'ach'; render(); }));
       a.appendChild(btn(`⭐ Навыки${S.sp ? ' (' + S.sp + ')' : ''}`, () => { S.screen = 'skills'; render(); }, S.sp ? 'primary' : ''));
+      a.appendChild(btn('❓ Справка', () => { S.helpFrom = 'map'; S.screen = 'help'; render(); }, 'full'));
       break;
     case 'start':
       a.appendChild(btn(`Сложность: ${DIFFS[meta.diff]} (нажми, чтобы сменить)`, () => { meta.diff = (meta.diff + 1) % 3; saveMeta(); render(); }, 'full primary'));
@@ -1077,12 +1081,12 @@ function render() {
       ACTIVES.forEach(p => a.appendChild(unlockedAt(p.req)
         ? btn(`${meta.sel.a === p.id ? '✔ ' : ''}${p.n} — ${p.t}`, () => toggleSel('a', p.id), 'full' + (meta.sel.a === p.id ? ' primary' : ''))
         : btn(`🔒 ${p.n} — откроется на этаже ${p.req}`, () => {}, 'full', true)));
-      a.appendChild(btn('❓ Как играть', () => { S.screen = 'help'; render(); }, 'full'));
+      a.appendChild(btn('❓ Как играть', () => { S.helpFrom = 'start'; S.screen = 'help'; render(); }, 'full'));
       a.appendChild(btn('▶ Начать забег', startRun, 'full primary'));
       break;
     case 'help':
       HELP.forEach(t => { const d = document.createElement('div'); d.className = 'head'; d.style.color = 'var(--text)'; d.textContent = t; a.appendChild(d); });
-      a.appendChild(btn('← Назад', () => { S.screen = 'start'; render(); }, 'full'));
+      a.appendChild(btn('← Назад', () => { S.screen = S.helpFrom || 'start'; render(); }, 'full'));
       break;
     case 'skills':
       head(a, `Очки навыков: ${S.sp}. Оружие «${weapon().n}» усиливается навыком «${SK[WEAPON_SKILL[S.wi]]}».`);
@@ -1188,6 +1192,18 @@ function roomName(t) {
   return { loot: 'Склад', enemy: 'Логово', rest: 'Убежище', trap: 'Ловушка', trader: 'Торговец',
            event: 'Происшествие', empty: 'Пусто', vending: 'Автомат', locked: 'Запертая комната' }[t];
 }
+
+// ---------- кнопка «Назад» (Android) ----------
+function backAction() {
+  const back = { craft: S.inBase ? 'base' : 'map', diary: 'map', ach: 'map', skills: S.inBase ? 'base' : 'map',
+                 kitchen: 'base', meals: S.mealFrom, help: S.helpFrom || 'start', locked: 'map', trader: 'map', vending: 'map' }[S.screen];
+  if (!back) return false;
+  S.screen = back; render(); return true;
+}
+try {
+  const App = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
+  if (App) App.addListener('backButton', () => { if (!backAction()) App.exitApp(); });
+} catch (e) {}
 
 // ---------- старт ----------
 if (load()) { if (!S.lift && S.screen !== 'start') newFloor(); log('Игра загружена.'); render(); } else newGame();
