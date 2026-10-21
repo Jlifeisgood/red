@@ -67,6 +67,13 @@ const TRAITS = {
   drain: ['⚡', 'тянет энергию'], dodge: ['💨', 'увёртлив'], enrage: ['😡', 'свирепеет при ранах'],
   stun: ['💫', 'оглушает'], multi: ['⚔⚔', 'два удара'], bleed: ['🩸', 'кровотечение'],
 };
+const ICONS = {
+  'Крыса-переросток': '🐀', 'Бродячий пёс': '🐕', 'Сборщик': '🧟', 'Слизень': '🦠', 'Ржавый дрон': '🤖', 'Летучая мышь': '🦇', 'Гигантская мокрица': '🐞',
+  'Одичавший сосед': '😡', 'Кошка-мутант': '🐈', 'Мародёр': '🕵', 'Ползун': '🐛', 'Скиталец': '🚶', 'Бродячий повар': '🔪', 'Сторожевой пёс': '🐕',
+  'Охранный робот': '🔧', 'Дрон-наблюдатель': '🛸', 'Сотрудник': '💼', 'Турникет-страж': '🚧', 'Менеджер': '👔', 'Уборщик-автомат': '🧹', 'Бухгалтер-призрак': '👻',
+  'Подопытный': '🧬', 'Мутант': '👹', 'Лаборант-культист': '🥼', 'Дрон-палач': '⚙', 'Химера': '🦁', 'Колба-слизень': '⚗', 'Скальпельщик': '🔬',
+  'Страж': '💂', 'Наместник': '👑', 'Тень': '🌑', 'Элитный дрон': '🛰', 'Королевская химера': '🐲', 'Золотая гончая': '🐺', 'Метрдотель': '🎩',
+};
 const traitIcons = e => Object.keys(TRAITS).filter(k => e[k]).map(k => TRAITS[k][0]).join('');
 const traitText = e => { const t = Object.keys(TRAITS).filter(k => e[k]).map(k => TRAITS[k][1]); return t.length ? ' — ' + t.join(', ') : ''; };
 
@@ -212,6 +219,14 @@ const SFX = {
   win:     () => [392, 523, 659, 784, 1047].forEach((f, i) => tone(f, 0.2, 'triangle', 0.09, 0, i * 0.14)),
 };
 const sfx = n => { try { SFX[n](); } catch (e) {} };
+const FONTS = [['Мелкий', 0.9], ['Обычный', 1], ['Крупный', 1.15]];
+let fontIdx = 1;
+try { const f = parseInt(localStorage.getItem('tower-font'), 10); if (f >= 0 && f < FONTS.length) fontIdx = f; } catch (e) {}
+function setFont(i) {
+  fontIdx = i; document.documentElement.style.zoom = FONTS[i][1];
+  try { localStorage.setItem('tower-font', String(i)); } catch (e) {}
+}
+setFont(fontIdx);
 let vibOn = true;
 try { vibOn = localStorage.getItem('tower-vib') !== '0'; } catch (e) {}
 function setVib(v) { vibOn = v; try { localStorage.setItem('tower-vib', v ? '1' : '0'); } catch (e) {} }
@@ -324,6 +339,21 @@ function load() {
     if (d) { best = d.best || 0; if (d.S && !d.S.over) { S = Object.assign(base(), d.S); S.dish = Object.assign(base().dish, d.S.dish); return true; } }
   } catch (e) {}
   return false;
+}
+
+function fx(kind) {
+  const el = kind === 'shake' ? $('app') : $('st-ic');
+  if (!el) return;
+  const c = kind === 'shake' ? 'shake' : 'hitflash';
+  el.classList.remove(c); void el.offsetWidth; el.classList.add(c);
+  setTimeout(() => el.classList.remove(c), 320);
+}
+function floatText(text, cls, where) {
+  const host = $(where);
+  if (!host) return;
+  const el = document.createElement('span');
+  el.className = 'float ' + cls; el.textContent = text;
+  host.appendChild(el); setTimeout(() => el.remove(), 900);
 }
 
 function log(text, cls = '') {
@@ -873,6 +903,7 @@ function attack(part) {
     const crit = chance((has('crit') ? 0.15 : 0) + S.skills.str * 0.015);
     if (crit) d *= 2;
     e.hp -= d; log(`${crit ? 'Критический удар! ' : ''}${P.n}: <b>${d}</b> урона.`);
+    fx('hit'); floatText(`-${d}${crit ? '!' : ''}`, crit ? 'crit' : 'dmg', 'stage');
     sfx(crit ? 'crit' : 'hit'); if (crit) vib(60);
     if (P.eff === 'weak' && e.hp > 0) { e.weak = 3; log('Враг ослаблен: его удары слабее.'); }
     if (P.eff === 'stag' && e.hp > 0) { e.stag = 2; log('Враг шатается и может пропустить ход.'); }
@@ -922,11 +953,11 @@ function enemyTurn() {
       if (hits > 1) raw = Math.max(1, Math.round(raw * 0.6));
       let dmg = Math.max(1, raw - defArmor());
       if (S.defending) dmg = Math.ceil(dmg / 2);
-      S.hp -= dmg; landed = true;
+      S.hp -= dmg; landed = true; floatText(`-${dmg}`, 'pdmg', 'hud');
       log(`<span class="enemy">${e.n}</span> наносит <b>${dmg}</b> урона.`, 'bad');
     }
     if (e.weak > 0) e.weak--;
-    if (landed) { sfx('hurt'); vib(40); }
+    if (landed) { sfx('hurt'); vib(40); fx('shake'); }
     if (landed && e.poison && !S.defending && chance(0.35) && !S.poison) { S.poison = 3 + (S.passive === 'glutton' ? 2 : 0); log('Ты отравлен!', 'bad'); }
     if (landed && e.stun && !S.defending && chance(0.2)) { S.stunned = true; log('Удар оглушил тебя: следующая атака пропадёт!', 'bad'); }
     if (landed && e.drain && chance(0.5)) { S.en = Math.max(0, S.en - 2); log('Враг вытягивает силы: -2 энергии.', 'bad'); }
@@ -1044,6 +1075,16 @@ function render() {
     `<span>🔩${S.scrap}</span><span>🧵${S.cloth}</span><span>🧪${S.chem}</span><span>🥩${S.meat}</span><span>🌿${S.herbs}</span><span>🍄${S.shrooms}</span>` +
     `<span>🔑${S.keys}</span><span>💣${S.grenade}</span><span>⚔️ ${weapon().n}</span><span>🛡️ ${armor().n}</span>` + (S.poison ? '<span style="color:var(--hp)">☠️ яд</span>' : '') + (S.bleed ? '<span style="color:var(--hp)">🩸 кровь</span>' : '');
 
+  const st = $('stage');
+  if (S.screen === 'fight' && S.enemy) {
+    const e = S.enemy;
+    st.style.display = 'flex';
+    $('st-ic').textContent = ICONS[e.n] || '👾';
+    $('st-name').textContent = `${e.n} ${Math.max(0, e.hp)}/${e.maxHp}`;
+    $('st-hp').style.width = Math.max(0, e.hp / e.maxHp * 100) + '%';
+    $('st-tr').textContent = traitIcons(e) + (e.weak > 0 ? ' · ослаблен' : '') + (e.stag > 0 ? ' · шатается' : '');
+  } else st.style.display = 'none';
+
   const a = $('actions'); a.innerHTML = '';
   switch (S.screen) {
     case 'map':
@@ -1093,6 +1134,7 @@ function render() {
       head(a, 'Настройки. Сохранение идёт автоматически; здесь его можно перенести на другое устройство или после переустановки.');
       a.appendChild(btn(`🔊 Звук: ${muted ? 'выкл' : 'вкл'}`, () => { setMuted(!muted); render(); }, 'full'));
       a.appendChild(btn(`📳 Вибрация: ${vibOn ? 'вкл' : 'выкл'}`, () => { setVib(!vibOn); vib(30); render(); }, 'full'));
+      a.appendChild(btn(`🔠 Размер текста: ${FONTS[fontIdx][0]}`, () => { setFont((fontIdx + 1) % FONTS.length); render(); }, 'full'));
       a.appendChild(btn('📤 Экспорт сохранения', () => { transferMode = 'export'; transferMsg = ''; S.screen = 'transfer'; render(); }));
       a.appendChild(btn('📥 Импорт сохранения', () => { transferMode = 'import'; transferMsg = ''; S.screen = 'transfer'; render(); }));
       a.appendChild(btn(confirmReset ? '⚠ Нажми ещё раз: сотрёт весь прогресс и достижения' : '🗑 Сбросить весь прогресс', resetAll, 'full danger'));
@@ -1202,7 +1244,6 @@ function render() {
       break;
     case 'fight': {
       const e = S.enemy;
-      a.appendChild(btn(`${e.n} ${traitIcons(e)}: ${Math.max(0, e.hp)}/${e.maxHp} HP${e.weak > 0 ? ' · ослаблен' : ''}${e.stag > 0 ? ' · шатается' : ''}`, () => {}, 'full danger', true));
       Object.keys(PARTS).forEach(k => {
         const r = dmgRange(k);
         a.appendChild(btn(`${PARTS[k].n} ${Math.round(hitChance(k) * 100)}% · ${r[0]}–${r[1]}`, () => attack(k), 'primary'));
