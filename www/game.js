@@ -212,7 +212,10 @@ const SFX = {
   win:     () => [392, 523, 659, 784, 1047].forEach((f, i) => tone(f, 0.2, 'triangle', 0.09, 0, i * 0.14)),
 };
 const sfx = n => { try { SFX[n](); } catch (e) {} };
-const vib = p => { if (!muted && navigator.vibrate) { try { navigator.vibrate(p); } catch (e) {} } };
+let vibOn = true;
+try { vibOn = localStorage.getItem('tower-vib') !== '0'; } catch (e) {}
+function setVib(v) { vibOn = v; try { localStorage.setItem('tower-vib', v ? '1' : '0'); } catch (e) {} }
+const vib = p => { if (vibOn && navigator.vibrate) { try { navigator.vibrate(p); } catch (e) {} } };
 function setMuted(m) {
   muted = m;
   try { localStorage.setItem('tower-mute', m ? '1' : '0'); } catch (e) {}
@@ -271,7 +274,7 @@ const base = () => ({
   enemy: null, defending: false, trader: null, event: null, over: false,
   perks: [], pendingPerks: 0, perkChoices: [], notes: [], freeUsed: false,
   kills: 0, grenadeUsed: false, cycle: 0, lift: null, vend: null, repairs: 0, vendBuys: 0,
-  keys: 0, diff: 1, lockIdx: -1, opened: 0, helpFrom: 'start', quest: null, quests: 0, mercy: 0, greed: 0, skills: { dex: 0, str: 0, spd: 0, acc: 0 }, sp: 0, bench: 1, kitchen: 1, passive: null, active: null, activeUsed: false, freeSteps: 0, luckTurns: 0, firstStrike: false,
+  keys: 0, diff: 1, lockIdx: -1, opened: 0, helpFrom: 'start', settingsFrom: 'start', quest: null, quests: 0, mercy: 0, greed: 0, skills: { dex: 0, str: 0, spd: 0, acc: 0 }, sp: 0, bench: 1, kitchen: 1, passive: null, active: null, activeUsed: false, freeSteps: 0, luckTurns: 0, firstStrike: false,
   meat: 0, herbs: 0, dish: { tea: 0, stew: 0, porridge: 0, bar: 0, roast: 0, soup: 0, pie: 0, antidote: 0, broth: 0, skewer: 0, feast: 0 }, inBase: false, stunned: false, cooked: 0, sleeps: 0, mealFrom: 'map',
 });
 const has = id => S.perks.includes(id);
@@ -1069,7 +1072,8 @@ function render() {
       a.appendChild(btn(`📖 Дневник ${S.notes.length}/${NOTES.length}`, () => { S.screen = 'diary'; render(); }));
       a.appendChild(btn(`🏆 Достижения ${ACHS.filter(x => meta.ach[x.id]).length}/${ACHS.length}`, () => { S.screen = 'ach'; render(); }));
       a.appendChild(btn(`⭐ Навыки${S.sp ? ' (' + S.sp + ')' : ''}`, () => { S.screen = 'skills'; render(); }, S.sp ? 'primary' : ''));
-      a.appendChild(btn('❓ Справка', () => { S.helpFrom = 'map'; S.screen = 'help'; render(); }, 'full'));
+      a.appendChild(btn('❓ Справка', () => { S.helpFrom = 'map'; S.screen = 'help'; render(); }));
+      a.appendChild(btn('⚙ Настройки', openSettings));
       break;
     case 'start':
       a.appendChild(btn(`Сложность: ${DIFFS[meta.diff]} (нажми, чтобы сменить)`, () => { meta.diff = (meta.diff + 1) % 3; saveMeta(); render(); }, 'full primary'));
@@ -1081,9 +1085,36 @@ function render() {
       ACTIVES.forEach(p => a.appendChild(unlockedAt(p.req)
         ? btn(`${meta.sel.a === p.id ? '✔ ' : ''}${p.n} — ${p.t}`, () => toggleSel('a', p.id), 'full' + (meta.sel.a === p.id ? ' primary' : ''))
         : btn(`🔒 ${p.n} — откроется на этаже ${p.req}`, () => {}, 'full', true)));
-      a.appendChild(btn('❓ Как играть', () => { S.helpFrom = 'start'; S.screen = 'help'; render(); }, 'full'));
+      a.appendChild(btn('❓ Как играть', () => { S.helpFrom = 'start'; S.screen = 'help'; render(); }));
+      a.appendChild(btn('⚙ Настройки', openSettings));
       a.appendChild(btn('▶ Начать забег', startRun, 'full primary'));
       break;
+    case 'settings':
+      head(a, 'Настройки. Сохранение идёт автоматически; здесь его можно перенести на другое устройство или после переустановки.');
+      a.appendChild(btn(`🔊 Звук: ${muted ? 'выкл' : 'вкл'}`, () => { setMuted(!muted); render(); }, 'full'));
+      a.appendChild(btn(`📳 Вибрация: ${vibOn ? 'вкл' : 'выкл'}`, () => { setVib(!vibOn); vib(30); render(); }, 'full'));
+      a.appendChild(btn('📤 Экспорт сохранения', () => { transferMode = 'export'; transferMsg = ''; S.screen = 'transfer'; render(); }));
+      a.appendChild(btn('📥 Импорт сохранения', () => { transferMode = 'import'; transferMsg = ''; S.screen = 'transfer'; render(); }));
+      a.appendChild(btn(confirmReset ? '⚠ Нажми ещё раз: сотрёт весь прогресс и достижения' : '🗑 Сбросить весь прогресс', resetAll, 'full danger'));
+      a.appendChild(btn('← Назад', () => { confirmReset = false; S.screen = S.settingsFrom || 'start'; render(); }, 'full'));
+      break;
+    case 'transfer': {
+      const ex = transferMode === 'export';
+      head(a, ex ? 'Скопируй этот код и сохрани его в надёжном месте (заметки, почта). Он содержит текущий забег и весь прогресс.'
+                 : 'Вставь код сохранения. Текущий забег и прогресс будут заменены.');
+      const ta = document.createElement('textarea');
+      ta.className = 'full'; ta.rows = 6; ta.spellcheck = false;
+      if (ex) { ta.value = exportCode(); ta.readOnly = true; ta.onfocus = () => ta.select(); } else ta.placeholder = 'Код сохранения…';
+      a.appendChild(ta);
+      if (transferMsg) head(a, transferMsg);
+      if (ex) a.appendChild(btn('📋 Скопировать', () => {
+        ta.focus(); ta.select();
+        try { navigator.clipboard.writeText(ta.value).then(() => log('Код скопирован.', 'good'), () => {}); } catch (e) {}
+      }, 'full primary'));
+      else a.appendChild(btn('📥 Загрузить сохранение', () => importCode(ta.value), 'full primary'));
+      a.appendChild(btn('← Назад', () => { S.screen = 'settings'; render(); }, 'full'));
+      break;
+    }
     case 'help':
       HELP.forEach(t => { const d = document.createElement('div'); d.className = 'head'; d.style.color = 'var(--text)'; d.textContent = t; a.appendChild(d); });
       a.appendChild(btn('← Назад', () => { S.screen = S.helpFrom || 'start'; render(); }, 'full'));
@@ -1193,10 +1224,38 @@ function roomName(t) {
            event: 'Происшествие', empty: 'Пусто', vending: 'Автомат', locked: 'Запертая комната' }[t];
 }
 
+// ---------- настройки, перенос сохранения ----------
+let transferMode = 'export', confirmReset = false, transferMsg = '';
+const enc = o => btoa(unescape(encodeURIComponent(JSON.stringify(o))));
+const dec = t => JSON.parse(decodeURIComponent(escape(atob(t.trim()))));
+function exportCode() {
+  const snap = Object.assign({}, S);
+  if (snap.screen === 'settings' || snap.screen === 'transfer') snap.screen = snap.settingsFrom || 'start';
+  return enc({ v: 1, S: snap, best, meta });
+}
+function importCode(code) {
+  let d;
+  try { d = dec(code); } catch (e) { d = null; }
+  if (!d || d.v !== 1 || !d.S || typeof d.S.floor !== 'number' || !d.meta) {
+    transferMsg = 'Код не подходит: скопируйте его целиком из экспорта.'; render(); return;
+  }
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ S: d.S, best: d.best || 0 }));
+    localStorage.setItem(META_KEY, JSON.stringify(d.meta));
+  } catch (e) { transferMsg = 'Не удалось записать сохранение.'; render(); return; }
+  location.reload();
+}
+function resetAll() {
+  if (!confirmReset) { confirmReset = true; render(); return; }
+  try { localStorage.removeItem(SAVE_KEY); localStorage.removeItem(META_KEY); } catch (e) {}
+  location.reload();
+}
+function openSettings() { S.settingsFrom = S.screen; confirmReset = false; S.screen = 'settings'; render(); }
+
 // ---------- кнопка «Назад» (Android) ----------
 function backAction() {
   const back = { craft: S.inBase ? 'base' : 'map', diary: 'map', ach: 'map', skills: S.inBase ? 'base' : 'map',
-                 kitchen: 'base', meals: S.mealFrom, help: S.helpFrom || 'start', locked: 'map', trader: 'map', vending: 'map' }[S.screen];
+                 kitchen: 'base', meals: S.mealFrom, help: S.helpFrom || 'start', settings: S.settingsFrom || 'start', transfer: 'settings', locked: 'map', trader: 'map', vending: 'map' }[S.screen];
   if (!back) return false;
   S.screen = back; render(); return true;
 }
