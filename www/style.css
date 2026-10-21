@@ -112,3 +112,9 @@ textarea { grid-column:1/-1; background:#0b0e13; color:var(--text); border:1px s
 .enemy { color:var(--hp); font-weight:600; }
 @media (prefers-reduced-motion: reduce) { #hero.walk *, #sv .hover, #sv .prop, #sv .squash, #sv .wingL, #sv .wingR, #sv .flick, #foe-art, .shake { animation:none !important; } }
 .title-art { grid-column:1/-1; border-radius:14px; overflow:hidden; border:1px solid #2a3342; margin-bottom:2px; } .title-art svg { display:block; }
+
+/* 3D-персонажи поверх SVG-фона */
+#gl { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:1; display:none; }
+#scene.gl #gl { display:block; }
+#ov { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:2; overflow:visible; }
+#scene.gl #hero-in, #scene.gl #foe-art { visibility:hidden; }

@@ -17,7 +17,8 @@ const $svg = id => document.getElementById(id);
 
 function initScene() {
   const sv = $('sv');
-  sv.innerHTML = ART.defs + '<g id="bg"></g><g id="doors"></g><g id="furns"></g><g id="liftg"></g><g id="foe"><g id="foe-in"><g id="foe-art"></g></g><g id="foe-ui"></g><g id="foe-zones"></g></g><g id="hero"><g id="hero-in"></g></g><g id="fl"></g>';
+  sv.innerHTML = ART.defs + '<g id="bg"></g><g id="doors"></g><g id="furns"></g><g id="liftg"></g><g id="foe"><g id="foe-in"><g id="foe-art"></g></g></g><g id="hero"><g id="hero-in"></g></g>';
+  $('ov').innerHTML = '<g id="foe-o"><g id="foe-ui"></g><g id="foe-zones"></g></g><g id="fl"></g>';
   const hit = '<rect x="-48" y="-170" width="96" height="170" fill="#fff" fill-opacity="0.001"/>';
   DOOR_CX.forEach((x, i) => {
     const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
@@ -40,7 +41,7 @@ function initScene() {
     g.onclick = () => sceneTap('f' + i);
     $('furns').appendChild(g);
   });
-  $('foe').style.transform = `translate(${FOE_X}px,${FOE_Y}px)`;
+  $('foe').style.transform = `translate(${FOE_X}px,${FOE_Y}px)`; $('foe-o').style.transform = `translate(${FOE_X}px,${FOE_Y}px)`;
   $('hero').style.transform = `translate(${HERO_HOME}px,${HERO_Y}px)`;
   $('foe-zones').addEventListener('click', ev => {
     const z = ev.target.getAttribute && ev.target.getAttribute('data-z');
@@ -103,14 +104,17 @@ function sceneTap(i) {
 // ---------- отклик на события боя ----------
 function fx(kind) {
   if (kind === 'shake') {
+    if (window.GL3D) GL3D.trigger('hero', 'hurt');
     [$('app'), $('hero-in')].forEach((el, i) => { const c = i ? 'hurt' : 'shake'; el.classList.remove(c); void el.getBoundingClientRect(); el.classList.add(c); setTimeout(() => el.classList.remove(c), 340); });
     return;
   }
+  if (window.GL3D) GL3D.trigger('foe', 'hurt');
   const e = $('foe-in');
   e.classList.remove('hit'); void e.getBoundingClientRect(); e.classList.add('hit');
   setTimeout(() => e.classList.remove('hit'), 300);
 }
 function lunge(who) {
+  if (window.GL3D) GL3D.trigger(who === 'hero' ? 'hero' : 'foe', 'attack');
   const el = $(who === 'hero' ? 'hero-in' : 'foe-in'), c = who === 'hero' ? 'lunge' : 'lunge-e';
   el.classList.remove(c); void el.getBoundingClientRect(); el.classList.add(c);
   setTimeout(() => el.classList.remove(c), 420);
@@ -132,12 +136,12 @@ function enemyBox(name) {
 function renderScene() {
   const hidden = ['start', 'help', 'settings', 'transfer'].includes(S.screen);
   $('scene').style.visibility = hidden ? 'hidden' : 'visible';
-  if (hidden) return;
+  if (hidden) { if (window.GL3D) GL3D.update({ visible: false }); return; }
   const fight = S.screen === 'fight' && !!S.enemy, inBase = !!S.inBase;
   const zone = zoneOf(S.floor), key = inBase ? 'base' : 'z' + zone;
   if (bgKey !== key) { bgKey = key; $('bg').innerHTML = inBase ? ART.base() : ART.bg[zone](); }
   const sc = $('scene');
-  sc.className = (fight ? 'fight ' : '') + (S.screen === 'dead' ? 'dead ' : '') + (SCREEN_ICON[S.screen] ? 'dim ' : '') + (inBase ? 'base' : 'z' + zone);
+  sc.className = (fight ? 'fight ' : '') + (S.screen === 'dead' ? 'dead ' : '') + (SCREEN_ICON[S.screen] ? 'dim ' : '') + (inBase ? 'base' : 'z' + zone) + (window.GL3D && GL3D.ready ? ' gl' : '');
 
   // герой
   const hk = S.wi + ':' + S.ai;
@@ -173,7 +177,7 @@ function renderScene() {
 
   // враг
   const foe = $('foe');
-  foe.style.display = fight ? '' : 'none';
+  foe.style.display = fight ? '' : 'none'; $('foe-o').style.display = fight ? '' : 'none';
   if (fight) {
     const e = S.enemy, fk = e.n + ':' + e.maxHp;
     const bx = enemyBox(e.n);
@@ -197,4 +201,5 @@ function renderScene() {
       t.textContent = z === 'armR' ? '' : Math.round(hitChance(z.startsWith('arm') ? 'arms' : z) * 100) + '%';
     });
   } else { foeKey = ''; }
+  if (window.GL3D) GL3D.update({ visible: true, wi: S.wi, ai: S.ai, enemy: fight ? S.enemy.n : null, dead: S.screen === 'dead', foeX: FOE_X, foeY: FOE_Y });
 }
