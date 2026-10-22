@@ -203,5 +203,5 @@ function renderScene() {
       t.textContent = z === 'armR' ? '' : Math.round(hitChance(z.startsWith('arm') ? 'arms' : z) * 100) + '%';
     });
   } else { foeKey = ''; }
-  if (window.GL3D) GL3D.update({ visible: true, wi: S.wi, ai: S.ai, enemy: fight ? S.enemy.n : null, dead: S.screen === 'dead', foeX: FOE_X, foeY: FOE_Y });
+  if (window.GL3D) GL3D.update({ env: inBase ? 'base' : 'z' + zone, visible: true, wi: S.wi, ai: S.ai, enemy: fight ? S.enemy.n : null, dead: S.screen === 'dead', foeX: FOE_X, foeY: FOE_Y });
 }

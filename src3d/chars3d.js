@@ -1,4 +1,5 @@
 // 3D-персонажи поверх 2D-сцены: свои скиннинг-модели героя и зомби, PBR-освещение, анимации.
+import { buildEnv, FY } from './env3d.js';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { buildHumanoid, weaponModel } from './humanoid.js';
@@ -100,6 +101,7 @@ function controller(model) {
 
 // ---------- сцена ----------
 let renderer, scene, camera, canvas, hostEl, pmrem;
+let env = null, envKey = '', keyLight = null;
 let hero = null, foe = null, dying = [], heroKey = '', foeKey = '', view = '', lastDraw = 0;
 
 function shadowTex() {
@@ -110,7 +112,7 @@ function shadowTex() {
 let SHT = null;
 function holder(model, w) {
   const root = new THREE.Group(), flip = new THREE.Group(), yaw = new THREE.Group();
-  root.add(flip); flip.add(yaw); yaw.rotation.y = YAW; yaw.add(model.group);
+  root.add(flip); flip.add(yaw); yaw.rotation.y = YAW; yaw.add(model.group); model.group.traverse(o => { if (o.isMesh || o.isSkinnedMesh) o.castShadow = true; });
   SHT = SHT || shadowTex();
   const sh = new THREE.Mesh(new THREE.PlaneGeometry(w * 2.4, w * .7), new THREE.MeshBasicMaterial({ map: SHT, transparent: true, depthWrite: false }));
   sh.position.set(0, 1, -30); root.add(sh);
@@ -129,7 +131,9 @@ function setupView() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75)); renderer.setSize(W, H, false);
   const sc = Math.min(W / VB.w, H / VB.h), offX = (W - VB.w * sc) / 2, offY = H - VB.h * sc;
   const xmin = VB.x - offX / sc, ytop = VB.y - offY / sc;
-  camera.left = xmin; camera.right = xmin + W / sc; camera.top = -ytop; camera.bottom = -(ytop + H / sc); camera.updateProjectionMatrix();
+  const wv = W / sc, hv = H / sc, D = 1100;
+  camera.fov = 2 * Math.atan(hv / 2 / D) * 180 / Math.PI; camera.aspect = W / H; camera.near = 50; camera.far = 3000;
+  camera.position.set(xmin + wv / 2, -(ytop + hv / 2), D); camera.lookAt(xmin + wv / 2, -(ytop + hv / 2), 0); camera.updateProjectionMatrix();
 }
 function trackHero() {
   const el = document.getElementById('hero'); if (!el || !hero) return;
@@ -167,12 +171,22 @@ function frame(ts) {
     if (d.left < .4) d.root.traverse(o => { if (o.material) [].concat(o.material).forEach(m => { m.transparent = true; m.opacity = Math.max(0, d.left / .4); }); });
     if (d.left <= 0) { disposeHolder(d); return false; } return true;
   });
+  if (env) {
+    env.update(dt, [0, 1, 2].map(i => document.getElementById('door' + i)), document.getElementById('lift'));
+    if (keyLight) { const hx = hero ? hero.root.position.x : 180; keyLight.position.set(hx - 90, 300, 380); keyLight.target.position.set(hx, FY, 0); keyLight.target.updateMatrixWorld(); }
+  }
   renderer.render(scene, camera);
 }
 GL.update = (o) => {
   if (!GL.ready) return;
   GL.active = !!o.visible && GL.enabled; canvas.style.display = GL.active ? '' : 'none';
   if (!GL.active) return;
+  if (o.env !== envKey) {
+    envKey = o.env || '';
+    if (env) { scene.remove(env.root); env.dispose(); env = null; }
+    if (envKey) { try { env = buildEnv(envKey); scene.add(env.root); } catch (e) { console.error(e); env = null; } }
+    hostEl.classList.toggle('env', !!env);
+  }
   const hk = o.wi + ':' + o.ai;
   if (hk !== heroKey) { heroKey = hk; disposeHolder(hero); const m = heroModel(o.wi, o.ai); markGlows(m); hero = holder(m, 22); scene.add(hero.root); }
   if (hero) { if (o.dead) hero.ctl.once('death'); else if (hero.ctl.dead) hero.ctl.reset(); }
@@ -200,11 +214,13 @@ GL.trigger = (who, kind) => {
 };
 function lights(sc) {
   sc.add(new THREE.HemisphereLight(0xc0cce8, 0x2a2018, 1.1));
-  const key = new THREE.DirectionalLight(0xffe6c2, 2.6); key.position.set(-140, 260, 320); sc.add(key);
+  const key = new THREE.DirectionalLight(0xffe6c2, 2.6); key.position.set(-140, 260, 320); sc.add(key, key.target);
+  key.castShadow = true; key.shadow.mapSize.set(1024, 1024); key.shadow.bias = -.0004; key.shadow.normalBias = .6;
+  Object.assign(key.shadow.camera, { left: -230, right: 230, top: 260, bottom: -120, near: 50, far: 1200 }); keyLight = key;
   const rim = new THREE.DirectionalLight(0x7fb0ff, 2.2); rim.position.set(220, 140, -260); sc.add(rim);
   const fill = new THREE.DirectionalLight(0xffb070, .5); fill.position.set(200, 40, 200); sc.add(fill);
 }
-function setupRenderer(r) { r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.15; }
+function setupRenderer(r) { r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap; r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.15; }
 GL.init = () => {
   try {
     hostEl = document.getElementById('scene'); canvas = document.getElementById('gl');
@@ -212,7 +228,7 @@ GL.init = () => {
     renderer.setClearColor(0x000000, 0); setupRenderer(renderer);
     scene = new THREE.Scene();
     pmrem = new THREE.PMREMGenerator(renderer); scene.environment = pmrem.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .55;
-    camera = new THREE.OrthographicCamera(0, 360, 0, -400, 1, 3000); camera.position.set(0, 0, 900); camera.lookAt(0, 0, 0);
+    camera = new THREE.PerspectiveCamera(30, .9, 50, 3000);
     lights(scene);
     GL.ready = true; if (GL.enabled) hostEl.classList.add('gl');
     requestAnimationFrame(frame);
