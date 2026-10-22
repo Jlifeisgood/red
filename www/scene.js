@@ -131,6 +131,7 @@ function floatText(text, cls, where) {
 
 // ---------- отрисовка ----------
 function enemyBox(name) {
+  if (window.GL3D && GL3D.ready && GL3D.enabled) return GL3D.box(name);
   const d = ENEMY_ART[name] || ['blob', 'grey', 1.2], b = KIND_BOX[d[0]] || [100, 100];
   return { h: b[0] * d[2], w: b[1] * d[2] };
 }

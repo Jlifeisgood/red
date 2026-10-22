@@ -970,6 +970,7 @@ function enemyTurn() {
 }
 function victory() {
   const e = S.enemy;
+  if (window.GL3D) GL3D.trigger('foe', 'death');
   S.kills++; sfx('pickup');
   const s = rnd(2, 4) + Math.floor(S.floor / 10);
   S.scrap += s; let msg = `${s}🔩`;
