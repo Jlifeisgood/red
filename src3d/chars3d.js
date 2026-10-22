@@ -2,14 +2,15 @@
 // Модель смотрит в +z. Герой справа от камеры «смотрит» вправо (3/4 к зрителю), враги — влево.
 import * as THREE from 'three';
 
-const GL = { ready: false, active: false, models: {} };
+const GL = { ready: false, enabled: true, active: false, models: {} };
+try { GL.enabled = localStorage.getItem('tower-3d') !== '0'; } catch (e) {}
 window.GL3D = GL;
 
 const VB = { x: 0, y: 24, w: 360, h: 400 };   // viewBox SVG-сцены
 const YAW = 0.85;
 
 let renderer, scene, camera, canvas, hostEl;
-let hero = null, foe = null, heroKey = '', foeKey = '', last = 0, view = '';
+let hero = null, foe = null, heroKey = '', foeKey = '', last = 0, view = '', lastDraw = 0;
 
 // ---------- материалы ----------
 const toonMap = (() => {
@@ -275,7 +276,7 @@ function disposeHolder(h) { if (!h) return; scene.remove(h.root); h.root.travers
 function setupView() {
   const r = hostEl.getBoundingClientRect(), W = Math.max(1, r.width), H = Math.max(1, r.height);
   const key = W + 'x' + H; if (key === view) return; view = key;
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
   renderer.setPixelRatio(dpr); renderer.setSize(W, H, false);
   const sc = Math.min(W / VB.w, H / VB.h), offX = (W - VB.w * sc) / 2, offY = H - VB.h * sc;   // xMidYMax meet
   const xmin = VB.x - offX / sc, xmax = xmin + W / sc, ytop = VB.y - offY / sc, ybot = ytop + H / sc;
@@ -293,7 +294,12 @@ function trackHero() {
 function frame(ts) {
   requestAnimationFrame(frame);
   if (!GL.active || !renderer) return;
-  const t = ts / 1000, dt = Math.min(.05, last ? t - last : .016); last = t;
+  const t = ts / 1000;
+  // в покое хватает 30 кадров/с: экономит батарею; анимации идут в полные 60
+  const busy = (hero && (hero.st.walk || hero.st.atk >= 0 || hero.st.flash > 0)) || (foe && (foe.st.atk >= 0 || foe.st.flash > 0 || foe.st.pop < 1));
+  if (t - lastDraw < (busy ? .0 : .031)) return;
+  lastDraw = t;
+  const dt = Math.min(.05, last ? t - last : .016); last = t;
   setupView();
   if (hero) {
     trackHero(); const s = hero.st;
@@ -318,8 +324,8 @@ function frame(ts) {
 }
 GL.update = (o) => {
   if (!GL.ready) return;
-  GL.active = !!o.visible; canvas.style.display = o.visible ? '' : 'none';
-  if (!o.visible) return;
+  GL.active = !!o.visible && GL.enabled; canvas.style.display = GL.active ? '' : 'none';
+  if (!GL.active) return;
   const hk = o.wi + ':' + o.ai;
   if (hk !== heroKey) { heroKey = hk; disposeHolder(hero); hero = holder(heroModel(o.wi, o.ai), 22); scene.add(hero.root); }
   if (hero) hero.st.dead = o.dead ? 1 : 0;
@@ -330,8 +336,14 @@ GL.update = (o) => {
   }
   if (foe) foe.root.position.set(o.foeX, -o.foeY, 0);
 };
+GL.setEnabled = (v) => {
+  GL.enabled = !!v;
+  try { localStorage.setItem('tower-3d', v ? '1' : '0'); } catch (e) {}
+  if (hostEl) hostEl.classList.toggle('gl', GL.ready && GL.enabled);
+  if (canvas) canvas.style.display = GL.ready && GL.enabled ? '' : 'none';
+};
 GL.trigger = (who, kind) => {
-  if (!GL.ready) return;
+  if (!GL.ready || !GL.enabled) return;
   const h = who === 'hero' ? hero : foe; if (!h) return;
   if (kind === 'attack') h.st.atk = 0; else if (kind === 'hurt') h.st.flash = 1;
 };
@@ -345,7 +357,7 @@ GL.init = () => {
     scene.add(new THREE.AmbientLight(0xaab6d0, 1.35));
     const key = new THREE.DirectionalLight(0xfff1d6, 2.2); key.position.set(-160, 260, 340); scene.add(key);
     const rim = new THREE.DirectionalLight(0x6fa8ff, 1.5); rim.position.set(200, 120, -260); scene.add(rim);
-    GL.ready = true; hostEl.classList.add('gl');
+    GL.ready = true; if (GL.enabled) hostEl.classList.add('gl');
     requestAnimationFrame(frame);
     if (typeof render === 'function') render();
   } catch (e) { GL.ready = false; if (hostEl) hostEl.classList.remove('gl'); }

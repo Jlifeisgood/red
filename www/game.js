@@ -206,6 +206,9 @@ function tone(freq, dur, type = 'square', vol = 0.07, slide = 0, delay = 0) {
   } catch (e) {}
 }
 const SFX = {
+  step:    () => tone(90 + Math.random() * 30, 0.05, 'triangle', 0.045, -20),
+  door:    () => { tone(200, 0.14, 'square', 0.05, -80); tone(110, 0.12, 'triangle', 0.05, -30, 0.05); },
+  ding:    () => { tone(1250, 0.28, 'sine', 0.06); tone(1570, 0.2, 'sine', 0.04, 0, 0.08); },
   click:   () => tone(520, 0.04, 'square', 0.03),
   hit:     () => tone(240, 0.12, 'sawtooth', 0.08, -140),
   crit:    () => { tone(300, 0.1, 'sawtooth', 0.09, -150); tone(600, 0.12, 'square', 0.06, -300, 0.05); },
@@ -1192,6 +1195,7 @@ function render() {
       head(a, 'Настройки. Сохранение идёт автоматически; здесь его можно перенести на другое устройство или после переустановки.');
       a.appendChild(btn(`🔊 Звук: ${muted ? 'выкл' : 'вкл'}`, () => { setMuted(!muted); render(); }, 'full'));
       a.appendChild(btn(`📳 Вибрация: ${vibOn ? 'вкл' : 'выкл'}`, () => { setVib(!vibOn); vib(30); render(); }, 'full'));
+      a.appendChild(btn(window.GL3D && GL3D.ready ? `🎮 Графика: ${GL3D.enabled ? '3D' : '2D (облегчённая)'}` : '🎮 Графика: 2D (3D недоступно на этом устройстве)', () => { if (window.GL3D && GL3D.ready) { GL3D.setEnabled(!GL3D.enabled); render(); } }, 'full', !(window.GL3D && GL3D.ready)));
       a.appendChild(btn(`🔠 Размер текста: ${FONTS[fontIdx][0]}`, () => { setFont((fontIdx + 1) % FONTS.length); render(); }, 'full'));
       a.appendChild(btn('📤 Экспорт сохранения', () => { transferMode = 'export'; transferMsg = ''; S.screen = 'transfer'; render(); }));
       a.appendChild(btn('📥 Импорт сохранения', () => { transferMode = 'import'; transferMsg = ''; S.screen = 'transfer'; render(); }));

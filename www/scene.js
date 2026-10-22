@@ -65,20 +65,21 @@ function walkThen(x, fn) {
   const ms = Math.max(240, Math.abs(x - heroX) * walkMs / 100);
   $('hero').style.transitionDuration = ms + 'ms';
   setHero(x, true);
-  setTimeout(() => { sceneBusy = false; $('hero').classList.remove('walk'); fn(); }, ms + 30);
+  const steps = setInterval(() => sfx('step'), 230);
+  setTimeout(() => { clearInterval(steps); sceneBusy = false; $('hero').classList.remove('walk'); fn(); }, ms + 30);
 }
 function enterDoor(i) {
   const r = S.rooms[i];
   if (S.screen !== 'map' || !r || r.done) return;
   walkThen(DOOR_CX[i] + 4, () => {
-    const d = $('door' + i); d.classList.add('open'); setTimeout(() => d.classList.remove('open'), 500);
+    sfx('door'); const d = $('door' + i); d.classList.add('open'); setTimeout(() => d.classList.remove('open'), 500);
     openRoom(i);
   });
 }
 function rideAnim() {
   if (S.screen !== 'map' || !S.lift || S.lift.state !== 'ok') return;
   walkThen(LIFT_CX - 8, () => {
-    const l = $('lift'); l.classList.add('open'); setTimeout(() => l.classList.remove('open'), 600);
+    sfx('ding'); const l = $('lift'); l.classList.add('open'); setTimeout(() => l.classList.remove('open'), 600);
     $('hero').classList.add('boarding');
     setTimeout(() => $('hero').classList.remove('boarding'), 600);
     ride();
@@ -141,7 +142,7 @@ function renderScene() {
   const zone = zoneOf(S.floor), key = inBase ? 'base' : 'z' + zone;
   if (bgKey !== key) { bgKey = key; $('bg').innerHTML = inBase ? ART.base() : ART.bg[zone](); }
   const sc = $('scene');
-  sc.className = (fight ? 'fight ' : '') + (S.screen === 'dead' ? 'dead ' : '') + (SCREEN_ICON[S.screen] ? 'dim ' : '') + (inBase ? 'base' : 'z' + zone) + (window.GL3D && GL3D.ready ? ' gl' : '');
+  sc.className = (fight ? 'fight ' : '') + (S.screen === 'dead' ? 'dead ' : '') + (SCREEN_ICON[S.screen] ? 'dim ' : '') + (inBase ? 'base' : 'z' + zone) + (window.GL3D && GL3D.ready && GL3D.enabled ? ' gl' : '');
 
   // герой
   const hk = S.wi + ':' + S.ai;
