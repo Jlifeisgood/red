@@ -21,7 +21,8 @@ function painter(cfg, splats) {
     return f;
   };
   const skinCol = (x, y, z) => {
-    let c = shade(skin, .86 + .26 * fbm(x * .09, y * .09, z * .09));
+    let c = shade(skin, .8 + .34 * fbm(x * .09, y * .09, z * .09));
+    if (cfg.zombie) c.lerp(C('#7d8a84'), .25);
     if (cfg.zombie) {
       const v = Math.abs(noise(x * .23, y * .23, z * .23) * 2 - 1); if (v < .07) c = mix(c, vein, .55);
       const rot = fbm(x * .05 + 9, y * .05, z * .05); if (rot > .62) c = mix(c, C('#3f4a2c'), (rot - .62) * 2.2);
@@ -34,8 +35,14 @@ function painter(cfg, splats) {
     return c;
   };
   const ao = (x, y, z) => { let k = 1; if (Math.abs(x) < 3.4 && y > 52 && y < 62) k *= .58; if (Math.abs(x) > 12 && Math.abs(x) < 18 && y > 88 && y < 99 && Math.abs(z) < 7) k *= .72; if (y > 99 && y < 107 && z > 2) k *= .75; if (y > 55 && y < 60 && Math.abs(Math.abs(x) - 8) < 2.5) k *= .85; return k; };
+  const GRAY = C('#7a7a74');
   const finish = (c, x, y, z) => {
     c = c.clone().multiplyScalar(ao(x, y, z));
+    // выцветание, грязь и копоть: убираем «игрушечную» насыщенность
+    const g = fbm(x * .07 + 5, y * .07, z * .07), low = smooth(34, 0, y);
+    c.lerp(GRAY, .22 + (cfg.zombie ? .12 : 0)); c.multiplyScalar(cfg.zombie ? .8 : .95);
+    c.multiplyScalar(1 - .42 * smooth(.45, .8, g) - .35 * low * (.5 + g));
+    if (cfg.zombie) { const br = fbm(x * .12 + 20, y * .12, z * .12); if (br > .6) c.lerp(C('#4a3350'), clamp((br - .6) * 3, 0, .5)); }
     const b = bloodAt(x, y, z);
     if (b > .3) c = mix(c, b > .7 ? blood : bloodFresh, clamp((b - .3) * 2.2, 0, .95));
     return c;
@@ -84,6 +91,17 @@ function painter(cfg, splats) {
 }
 
 // ---------- геометрия ----------
+// складки ткани: смещение вершин вдоль нормали (шум + поперечные заломы)
+function fold(geo, amp = .55, f = .5) {
+  const P = geo.attributes.position, N = geo.attributes.normal;
+  for (let i = 0; i < P.count; i++) {
+    const x = P.getX(i), y = P.getY(i), z = P.getZ(i);
+    const d = amp * ((fbm(x * f * .5, y * f, z * f * .5) - .5) * 2 + .5 * Math.sin(y * 1.1 + x * .4 + noise(x * .2, y * .2, z * .2) * 5));
+    P.setXYZ(i, x + N.getX(i) * d, y, z + N.getZ(i) * d);
+  }
+  geo.computeVertexNormals(); return geo;
+}
+
 function bodyGeometry(cfg, sk) {
   const B = new SkinBuilder(), I = sk.idx;
   setSeed(cfg.seed || 7);
@@ -108,7 +126,7 @@ function bodyGeometry(cfg, sk) {
     if (fat) { const b = Math.exp(-Math.pow((y - 72) / 11, 2)); if (z > 0) z *= 1 + fat * 1.5 * b; x *= 1 + fat * .45 * b; }
     tp.setXYZ(i, x, y, z);
   }
-  tg.computeVertexNormals();
+  tg.computeVertexNormals(); fold(tg, .5);
   B.add(tg, (x, y) => y < 64 ? [I.hips, I.hips, 0] : y < 71 ? w2('hips', 'spine', smooth(64, 71, y)) : y < 81 ? [I.spine, I.spine, 0] : y < 88 ? w2('spine', 'chest', smooth(81, 88, y)) : [I.chest, I.chest, 0], P.torso);
 
   // лабораторный халат: юбка поверх таза и бёдер
@@ -155,8 +173,8 @@ function bodyGeometry(cfg, sk) {
     const big = (cfg.bigArm === s ? 1.7 : 1) * (1 + mus * .4 + fat * .2) * (1 - thin * .2);
     const sh = V3(sg * 17, 100, 0), el = V3(sg * 18, 77, 1), wr = V3(sg * 18.6, 57, 2);
     const bg2 = cfg.bigArm === s;
-    B.add(alignAlong(bg2 ? taper(7.6, 6.4, 23.1) : taper(5.8 * big, 4.6 * big, 23.1), sh, el), (x, y) => y > 95 ? w2('uarm' + s, 'chest', smooth(95, 101, y) * .55) : [I['uarm' + s], I['uarm' + s], 0], P.arm);
-    B.add(alignAlong(bg2 ? taper(6.6, 9.8, 20.2) : taper(4.6 * big, 3.5 * big, 20.2), el, wr), (x, y) => y > 73 ? w2('farm' + s, 'uarm' + s, smooth(73, 78.5, y) * .5) : [I['farm' + s], I['farm' + s], 0], P.arm);
+    B.add(alignAlong(fold(bg2 ? taper(7.6, 6.4, 23.1) : taper(5.8 * big, 4.6 * big, 23.1), .45), sh, el), (x, y) => y > 95 ? w2('uarm' + s, 'chest', smooth(95, 101, y) * .55) : [I['uarm' + s], I['uarm' + s], 0], P.arm);
+    B.add(alignAlong(fold(bg2 ? taper(6.6, 9.8, 20.2) : taper(4.6 * big, 3.5 * big, 20.2), .4), el, wr), (x, y) => y > 73 ? w2('farm' + s, 'uarm' + s, smooth(73, 78.5, y) * .5) : [I['farm' + s], I['farm' + s], 0], P.arm);
     const hb = I['hand' + s], hk = bg2 ? 1.9 : big > 1.3 ? 1.5 : 1;
     const palm = ellipsoid(3 * hk, 5.8 * hk, 4.3 * hk, 14, 10); palm.translate(sg * 18.7, 51, 2.6); B.add(palm, () => [hb, hb, 0], P.hand);
     const fl = cfg.zombie ? 9.6 : 7.6;
@@ -174,10 +192,11 @@ function bodyGeometry(cfg, sk) {
       B.add(st, (x, y) => y > 55 ? w2('thigh' + s, 'hips', smooth(55, 61, y) * .6) : [I['thigh' + s], I['thigh' + s], 0], P.stump);
       return;
     }
-    B.add(alignAlong(taper(7.4 * lk, 5.6 * lk, 28), hip, kn), (x, y) => y > 55 ? w2('thigh' + s, 'hips', smooth(55, 61, y) * .6) : [I['thigh' + s], I['thigh' + s], 0], P.leg);
-    B.add(alignAlong(taper(5.6 * lk, 3.9 * lk, 24.5), kn, an), (x, y) => y > 28.5 ? w2('shin' + s, 'thigh' + s, smooth(28.5, 34, y) * .5) : [I['shin' + s], I['shin' + s], 0], P.leg);
+    B.add(alignAlong(fold(taper(7.4 * lk, 5.6 * lk, 28), .55), hip, kn), (x, y) => y > 55 ? w2('thigh' + s, 'hips', smooth(55, 61, y) * .6) : [I['thigh' + s], I['thigh' + s], 0], P.leg);
+    B.add(alignAlong(fold(taper(5.6 * lk, 3.9 * lk, 24.5), .5), kn, an), (x, y) => y > 28.5 ? w2('shin' + s, 'thigh' + s, smooth(28.5, 34, y) * .5) : [I['shin' + s], I['shin' + s], 0], P.leg);
     const fb = I['foot' + s];
-    const shoe = ellipsoid(4.6, 3.6, 9, 18, 12); shoe.translate(sg * 7.7, 4.2, 4.4); B.add(shoe, () => [fb, fb, 0], P.foot);
+    const shoe = ellipsoid(5.1, 4.2, 9.6, 18, 12); shoe.translate(sg * 7.7, 4.4, 4.6);
+    const shaft = taper(5.3 * lk, 5.1 * lk, 13, 16, 4); shaft.translate(sg * 7.7, 15, .8); B.add(shaft, () => [I['shin' + s], I['foot' + s], .5], P.foot); B.add(shoe, () => [fb, fb, 0], P.foot);
     const sole = new THREE.BoxGeometry(9, 1.6, 17.4); sole.translate(sg * 7.7, .8, 4.4); B.add(sole, () => [fb, fb, 0], P.foot);
   });
   return B.build();
@@ -213,7 +232,7 @@ function gear(cfg, sk, mats) {
   const hs = cfg.headScale || 1;
   // глаза
   [-1, 1].forEach(s => {
-    if (cfg.zombie) { const e = new THREE.Mesh(new THREE.SphereGeometry(1.9 * hs, 14, 10), glow(cfg.eye || '#f2e7a0', cfg.eyeGlow || 1.6)); e.position.set(s * 4.2 * hs, 124.6, 11 * hs + 1); attach(sk, 'head', e); }
+    if (cfg.zombie) { const e = new THREE.Mesh(new THREE.SphereGeometry(1.45 * hs, 14, 10), glow(cfg.eye || '#c9bf7a', cfg.eyeGlow ? cfg.eyeGlow * .6 : .55)); e.position.set(s * 4.2 * hs, 124.6, 11 * hs + 1); attach(sk, 'head', e); }
     else { const w = new THREE.Mesh(new THREE.SphereGeometry(1.9, 14, 10), pbr('#f2efe8', { roughness: .25 })); w.position.set(s * 4.2, 124.6, 12); attach(sk, 'head', w);
       const ir = new THREE.Mesh(new THREE.SphereGeometry(1.05, 10, 8), pbr('#3a2a1c', { roughness: .2 })); ir.position.set(s * 4.2, 124.6, 13.7); attach(sk, 'head', ir); }
   });
@@ -238,8 +257,8 @@ function gear(cfg, sk, mats) {
     const v = new THREE.Mesh(vg, m); mats.push(m); attach(sk, 'chest', v);
     if (X.has('spikes')) for (let i = 0; i < 10; i++) { const a = -PI * .6 + i * PI * .13; const c = new THREE.Mesh(new THREE.ConeGeometry(1.4, 6, 8), pbr('#c8ced6', { metalness: .9, roughness: .3 })); c.position.set(Math.sin(a) * 19.6, 92 - (i % 2) * 8, Math.cos(a) * 13.6); c.lookAt(c.position.clone().add(V3(Math.sin(a), 0, Math.cos(a)))); c.rotateX(PI / 2); attach(sk, 'chest', c); }
   }
-  if (X.has('backpack')) { const m = pbr('#6e5233', { roughness: .85 }); add('chest', new THREE.BoxGeometry(22, 30, 11), m, V3(0, 84, -15.5)); add('chest', new THREE.BoxGeometry(22.6, 7, 11.6), pbr('#9a7a4a', { roughness: .8 }), V3(0, 96, -15.5)); add('chest', new THREE.BoxGeometry(16, 10, 3), pbr('#55402a', { roughness: .9 }), V3(0, 78, -9.4)); }
-  if (X.has('scarf')) add('chest', new THREE.TorusGeometry(7.6, 2.8, 10, 24), cloth('#a8322a'), V3(0, 102.5, 0)).rotation.x = PI / 2;
+  if (X.has('backpack')) { const m = pbr('#3a3a30', { roughness: .85 }); add('chest', new THREE.BoxGeometry(22, 30, 11), m, V3(0, 84, -15.5)); add('chest', new THREE.BoxGeometry(22.6, 7, 11.6), pbr('#4a4838', { roughness: .8 }), V3(0, 96, -15.5)); add('chest', new THREE.BoxGeometry(16, 10, 3), pbr('#55402a', { roughness: .9 }), V3(0, 78, -9.4)); }
+  if (X.has('scarf')) add('chest', new THREE.TorusGeometry(7.6, 2.8, 10, 24), cloth('#5a2a26'), V3(0, 102.5, 0)).rotation.x = PI / 2;
   if (X.has('pads')) [['L', 1], ['R', -1]].forEach(([s, sg]) => add('uarm' + s, ellipsoid(7, 5, 7.4, 16, 10), pbr(cfg.padCol || '#4a5260', { roughness: .45, metalness: .4 }), V3(sg * 18, 100.5, 0)));
   if (X.has('stripes')) [-1, 1].forEach(s => add('chest', new THREE.BoxGeometry(1.4, 22, .6), glow(cfg.stripe || '#59e1ff', 2.2), V3(s * 6.5, 88, 11.6)));
   if (X.has('pustules')) { const m = pbr('#9fbf5a', { roughness: .18, emissive: C('#3a5a10'), emissiveIntensity: .4 }); setSeed(cfg.seed + 5); for (let i = 0; i < 9; i++) { const bone = ['chest', 'spine', 'uarmL', 'uarmR'][i % 4]; const w = sk.world[bone]; add(bone, new THREE.SphereGeometry(1.6 + rand() * 2.2, 12, 8), m, V3(w.x + (rand() - .5) * 18, w.y - rand() * 14, 9 + rand() * 4)); } }

@@ -22,11 +22,11 @@ const YAW = 0.78;
 const HUMAN_SCALE = 1.05;
 
 // ---------- внешность ----------
-const JACKETS = ['#6b5a45', '#4a6fa5', '#7d8a99', '#3f6b4a', '#2e3a4d', '#3a3f6e'];
+const JACKETS = ['#5e5240', '#3d4f66', '#565e66', '#3a4f3c', '#262e3a', '#33364f'];
 // Параметры внешности всех 35 врагов: q — четвероногий, style — тип скелета и анимаций
 export const ZOMBIES = {
   'Крыса-переросток': { q: 1, fur: '#5b4a3c', ears: 'round', snout: 1.15, tailCol: '#c99a96', tailLen: 2.2, tailK: .6, scale: .55, long: 1.15, legK: .8, eye: '#ff3d2e', speed: 1.4 },
-  'Бродячий пёс': { q: 1, fur: '#6b5640', scale: 1, eye: '#ffcf3d' },
+  'Бродячий пёс': { q: 1, fur: '#4a3d30', scale: 1, eye: '#ffcf3d' },
   'Сборщик': { skin: '#8f9a7a', shirt: '#6b6f5e', pants: '#3d4250', hair: '#2a221a', torn: .5, blood: .5, x: ['backpack'] },
   'Слизень': { style: 'bloater', fat: 1.3, skin: '#8fb06a', shirt: null, pants: '#4a5a3a', sleeves: 'none', x: ['pustules'], scale: 1.08, torn: .8, blood: .3, bald: true },
   'Ржавый дрон': { style: 'crawler', legless: true, skin: '#87926f', shirt: '#4f5a4a', pants: '#2f3440', torn: .7, blood: .9, hair: '#1e1a14', bald: true },
@@ -65,7 +65,7 @@ const hashName = s => { let h = 7; for (const ch of s) h = (h * 31 + ch.charCode
 
 function heroModel(wi, ai) {
   const x = ['cap', 'scarf', 'backpack']; if (ai >= 2) x.push('pads'); if (ai >= 4) x.push('stripes');
-  const m = buildHumanoid({ style: 'hero', zombie: false, seed: 11, skin: '#e0b896', shirt: JACKETS[ai] || JACKETS[0], pants: '#34405e', shoes: '#2a2420', hair: '#3a2a1c',
+  const m = buildHumanoid({ style: 'hero', zombie: false, seed: 11, skin: '#e0b896', shirt: JACKETS[ai] || JACKETS[0], pants: '#2f343f', shoes: '#2a2420', hair: '#3a2a1c',
     sleeves: 'long', torn: ai === 0 ? .25 : .05, blood: .08, x, hat: '#2c364b', padCol: ai >= 4 ? '#2a3140' : '#5a6372', stripe: ai >= 5 ? '#a66bff' : '#59e1ff' });
   const w = weaponModel(wi);
   w.position.set(-.2, -7.6, 3.2); w.rotation.set(Math.PI / 2 - .35, 0, 0);
@@ -213,14 +213,14 @@ GL.trigger = (who, kind) => {
   else if (kind === 'death') { h.dyingStarted = true; h.ctl.once('death'); }
 };
 function lights(sc) {
-  sc.add(new THREE.HemisphereLight(0xc0cce8, 0x2a2018, 1.1));
-  const key = new THREE.DirectionalLight(0xffe6c2, 2.6); key.position.set(-140, 260, 320); sc.add(key, key.target);
+  sc.add(new THREE.HemisphereLight(0xaab8d0, 0x2a2018, .95));
+  const key = new THREE.DirectionalLight(0xffdcae, 3.1); key.position.set(-140, 260, 320); sc.add(key, key.target);
   key.castShadow = true; key.shadow.mapSize.set(1024, 1024); key.shadow.bias = -.0004; key.shadow.normalBias = .6;
   Object.assign(key.shadow.camera, { left: -230, right: 230, top: 260, bottom: -120, near: 50, far: 1200 }); keyLight = key;
   const rim = new THREE.DirectionalLight(0x7fb0ff, 2.2); rim.position.set(220, 140, -260); sc.add(rim);
   const fill = new THREE.DirectionalLight(0xffb070, .5); fill.position.set(200, 40, 200); sc.add(fill);
 }
-function setupRenderer(r) { r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap; r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.15; }
+function setupRenderer(r) { r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap; r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.02; }
 GL.init = () => {
   try {
     hostEl = document.getElementById('scene'); canvas = document.getElementById('gl');
