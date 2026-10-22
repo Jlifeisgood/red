@@ -1129,7 +1129,7 @@ function render() {
   $('b-xp').style.width = (S.xp / (S.lvl * 20) * 100) + '%';
   $('t-hp').textContent = `${S.hp}/${S.maxHp}`;
   $('t-en').textContent = `${S.en}/${S.maxEn}`;
-  $('lvl').textContent = `Ур. ${S.lvl}`;
+  $('lvl').textContent = S.lvl;
   $('t-xp').textContent = `${S.xp}/${S.lvl * 20}`;
   $('quest').textContent = S.quest ? `📞 до этажа ${S.quest.floor}` : '';
   $('inv').innerHTML =
