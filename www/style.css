@@ -132,4 +132,4 @@ textarea { grid-column:1/-1; background:#0b0e13; color:var(--text); border:1px s
 #scene.env #sv .door, #scene.env #sv .lift, #scene.env #sv .furn { opacity:0 !important; animation:none !important; filter:none; }
 
 #scene::after { content:''; position:absolute; inset:0; pointer-events:none; z-index:3; background:radial-gradient(ellipse at 50% 55%,rgba(0,0,0,0) 45%,rgba(0,0,0,.62) 100%),linear-gradient(180deg,rgba(0,0,0,.5),rgba(0,0,0,0) 22%); mix-blend-mode:multiply; }
-#scene.gl #gl { filter:saturate(.9) contrast(1.06); }
+#scene.gl #gl { filter:saturate(1.35) contrast(1.08); }

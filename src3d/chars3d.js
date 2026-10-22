@@ -1,5 +1,6 @@
 // 3D-персонажи поверх 2D-сцены: свои скиннинг-модели героя и зомби, PBR-освещение, анимации.
 import { buildEnv, FY } from './env3d.js';
+import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { buildHumanoid, weaponModel } from './humanoid.js';
@@ -101,6 +102,30 @@ function controller(model) {
 
 // ---------- сцена ----------
 let renderer, scene, camera, canvas, hostEl, pmrem;
+// ---------- комикс-стиль: ступенчатая заливка и жирный контур ----------
+let RAMP = null, effect = null;
+const TOONS = new WeakMap();
+function toonMat(m, outline) {
+  if (m.isMeshToonMaterial) return m;
+  if (TOONS.has(m)) return TOONS.get(m);
+  RAMP = RAMP || Object.assign(new THREE.DataTexture(new Uint8Array([120, 170, 220, 255]), 4, 1, THREE.RedFormat), { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, needsUpdate: true });
+  let map = m.map, col = m.color;
+  if (map && map.userData.surf && map.image) {            // фактурные текстуры -> плоский средний цвет (комикс)
+    let src = map.image, w = src.width || 256;
+    while (w > 1) { w = Math.max(1, w >> 1); const c = document.createElement('canvas'); c.width = c.height = w; const cx = c.getContext('2d'); cx.imageSmoothingQuality = 'high'; cx.drawImage(src, 0, 0, w, w); src = c; }
+    const d = src.getContext('2d').getImageData(0, 0, 1, 1).data; col = new THREE.Color().setRGB(d[0] / 255, d[1] / 255, d[2] / 255, THREE.SRGBColorSpace).multiply(m.color); map = null; col.multiplyScalar(2.1);
+  }
+  const n = new THREE.MeshToonMaterial({ color: col, map, vertexColors: m.vertexColors, emissive: m.emissive, emissiveIntensity: m.emissiveIntensity, transparent: m.transparent, opacity: m.opacity, side: m.side, depthWrite: m.depthWrite, gradientMap: RAMP });
+  n.userData.outlineParameters = outline ? { thickness: .0075, color: [0, 0, 0], alpha: 1, visible: true } : { visible: false };
+  TOONS.set(m, n); return n;
+}
+function toonify(root, outline) {
+  root.traverse(o => {
+    if (!o.material) return;
+    if ((o.isMesh || o.isSkinnedMesh) && [].concat(o.material).every(m => m.isMeshStandardMaterial || m.isMeshToonMaterial)) o.material = Array.isArray(o.material) ? o.material.map(m => toonMat(m, outline)) : toonMat(o.material, outline);
+    else [].concat(o.material).forEach(m => { m.userData.outlineParameters = { visible: false }; });
+  });
+}
 let env = null, envKey = '', keyLight = null;
 let hero = null, foe = null, dying = [], heroKey = '', foeKey = '', view = '', lastDraw = 0;
 
@@ -123,6 +148,7 @@ function disposeHolder(h) {
   if (!h) return; scene.remove(h.root);
   h.root.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) [].concat(o.material).forEach(m => m.dispose()); });
 }
+function toonModel(model) { toonify(model.group, true); model.mats = model.mats.map(m => toonMat(m, true)); }
 function markGlows(model) { model.group.traverse(o => { if (o.material && o.material.emissiveIntensity > 1) o.material.userData.glow = true; }); model.mats.forEach(m => { if (m.emissiveIntensity > 1) m.userData.glow = true; }); }
 
 function setupView() {
@@ -175,7 +201,7 @@ function frame(ts) {
     env.update(dt, [0, 1, 2].map(i => document.getElementById('door' + i)), document.getElementById('lift'));
     if (keyLight) { const hx = hero ? hero.root.position.x : 180; keyLight.position.set(hx - 90, 300, 380); keyLight.target.position.set(hx, FY, 0); keyLight.target.updateMatrixWorld(); }
   }
-  renderer.render(scene, camera);
+  effect.render(scene, camera);
 }
 GL.update = (o) => {
   if (!GL.ready) return;
@@ -184,18 +210,18 @@ GL.update = (o) => {
   if (o.env !== envKey) {
     envKey = o.env || '';
     if (env) { scene.remove(env.root); env.dispose(); env = null; }
-    if (envKey) { try { env = buildEnv(envKey); scene.add(env.root); } catch (e) { console.error(e); env = null; } }
+    if (envKey) { try { env = buildEnv(envKey); toonify(env.root, false); scene.add(env.root); } catch (e) { console.error(e); env = null; } }
     hostEl.classList.toggle('env', !!env);
   }
   const hk = o.wi + ':' + o.ai;
-  if (hk !== heroKey) { heroKey = hk; disposeHolder(hero); const m = heroModel(o.wi, o.ai); markGlows(m); hero = holder(m, 22); scene.add(hero.root); }
+  if (hk !== heroKey) { heroKey = hk; disposeHolder(hero); const m = heroModel(o.wi, o.ai); toonModel(m); markGlows(m); hero = holder(m, 22); scene.add(hero.root); }
   if (hero) { if (o.dead) hero.ctl.once('death'); else if (hero.ctl.dead) hero.ctl.reset(); }
   const fk = o.enemy || '';
   if (fk !== foeKey) {
     foeKey = fk;
     if (foe) { if (foe.dyingStarted) { foe.left = 1.5; dying.push(foe); } else disposeHolder(foe); }
     foe = null;
-    if (fk) { const m = enemyModel(fk); markGlows(m); foe = holder(m, m.cfg.q ? 36 * (m.cfg.scale || 1) : 28); foe.flip.scale.x = -1; foe.st.dir = -1; foe.root.scale.set(0, 0, 0); scene.add(foe.root); }
+    if (fk) { const m = enemyModel(fk); toonModel(m); markGlows(m); foe = holder(m, m.cfg.q ? 36 * (m.cfg.scale || 1) : 28); foe.flip.scale.x = -1; foe.st.dir = -1; foe.root.scale.set(0, 0, 0); scene.add(foe.root); }
   }
   if (foe) foe.root.position.set(o.foeX, -o.foeY, 0);
 };
@@ -213,20 +239,20 @@ GL.trigger = (who, kind) => {
   else if (kind === 'death') { h.dyingStarted = true; h.ctl.once('death'); }
 };
 function lights(sc) {
-  sc.add(new THREE.HemisphereLight(0xaab8d0, 0x2a2018, .95));
-  const key = new THREE.DirectionalLight(0xffdcae, 3.1); key.position.set(-140, 260, 320); sc.add(key, key.target);
+  sc.add(new THREE.HemisphereLight(0xaab8d0, 0x4a3c30, 1.9));
+  const key = new THREE.DirectionalLight(0xffe4bc, 2.4); key.position.set(-140, 260, 320); sc.add(key, key.target);
   key.castShadow = true; key.shadow.mapSize.set(1024, 1024); key.shadow.bias = -.0004; key.shadow.normalBias = .6;
   Object.assign(key.shadow.camera, { left: -230, right: 230, top: 260, bottom: -120, near: 50, far: 1200 }); keyLight = key;
   const rim = new THREE.DirectionalLight(0x7fb0ff, 2.2); rim.position.set(220, 140, -260); sc.add(rim);
   const fill = new THREE.DirectionalLight(0xffb070, .5); fill.position.set(200, 40, 200); sc.add(fill);
 }
-function setupRenderer(r) { r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap; r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.02; }
+function setupRenderer(r) { r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap; r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.NoToneMapping; }
 GL.init = () => {
   try {
     hostEl = document.getElementById('scene'); canvas = document.getElementById('gl');
     renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
     renderer.setClearColor(0x000000, 0); setupRenderer(renderer);
-    scene = new THREE.Scene();
+    scene = new THREE.Scene(); effect = new OutlineEffect(renderer, { defaultThickness: .0075, defaultColor: [0, 0, 0], defaultAlpha: 1 });
     pmrem = new THREE.PMREMGenerator(renderer); scene.environment = pmrem.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .55;
     camera = new THREE.PerspectiveCamera(30, .9, 50, 3000);
     lights(scene);
@@ -242,11 +268,11 @@ GL.gallery = (cv, items, w, h, cols) => {
   const cam = new THREE.OrthographicCamera(0, w, 0, -h, 1, 3000); cam.position.z = 900;
   cols = cols || Math.ceil(Math.sqrt(items.length * w / h)); const rows = Math.ceil(items.length / cols), cw = w / cols, ch = h / rows;
   items.forEach((it, i) => {
-    const m = it.hero ? heroModel(it.wi, it.ai) : enemyModel(it.name);
+    const m = it.hero ? heroModel(it.wi, it.ai) : enemyModel(it.name); toonModel(m);
     const hh = holder(m, m.cfg && m.cfg.q ? 36 : 28); hh.flip.scale.x = it.hero ? 1 : -1;
     const c = i % cols, rr = Math.floor(i / cols); hh.root.position.set(c * cw + cw / 2, -(rr * ch + ch * .9), 0); hh.root.scale.setScalar((it.s || 1) * ch / 175); sc.add(hh.root);
     const a = hh.ctl.mixer.clipAction(m.clips[it.anim || 'idle']); hh.ctl.mixer.stopAllAction(); a.play(); hh.ctl.mixer.setTime(it.t || .4);
   });
-  r.render(sc, cam); return true;
+  new OutlineEffect(r, { defaultThickness: .0075, defaultColor: [0, 0, 0], defaultAlpha: 1 }).render(sc, cam); return true;
 };
 document.addEventListener('DOMContentLoaded', GL.init);

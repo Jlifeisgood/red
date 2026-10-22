@@ -6,7 +6,7 @@ const cache = new Map();
 const mk = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
 
 function texture(c, srgb, rep, aniso = 4) {
-  const t = new THREE.CanvasTexture(c);
+  const t = new THREE.CanvasTexture(c); t.userData.surf = true;
   t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rep[0], rep[1]); t.anisotropy = aniso;
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
   return t;

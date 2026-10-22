@@ -40,8 +40,8 @@ function painter(cfg, splats) {
     c = c.clone().multiplyScalar(ao(x, y, z));
     // выцветание, грязь и копоть: убираем «игрушечную» насыщенность
     const g = fbm(x * .07 + 5, y * .07, z * .07), low = smooth(34, 0, y);
-    c.lerp(GRAY, .22 + (cfg.zombie ? .12 : 0)); c.multiplyScalar(cfg.zombie ? .8 : .95);
-    c.multiplyScalar(1 - .42 * smooth(.45, .8, g) - .35 * low * (.5 + g));
+    c.lerp(GRAY, cfg.zombie ? .12 : .04); c.multiplyScalar(1.05);
+    c.multiplyScalar(1 - .22 * smooth(.5, .8, g) - .2 * low * (.5 + g));
     if (cfg.zombie) { const br = fbm(x * .12 + 20, y * .12, z * .12); if (br > .6) c.lerp(C('#4a3350'), clamp((br - .6) * 3, 0, .5)); }
     const b = bloodAt(x, y, z);
     if (b > .3) c = mix(c, b > .7 ? blood : bloodFresh, clamp((b - .3) * 2.2, 0, .95));
@@ -126,7 +126,7 @@ function bodyGeometry(cfg, sk) {
     if (fat) { const b = Math.exp(-Math.pow((y - 72) / 11, 2)); if (z > 0) z *= 1 + fat * 1.5 * b; x *= 1 + fat * .45 * b; }
     tp.setXYZ(i, x, y, z);
   }
-  tg.computeVertexNormals(); fold(tg, .5);
+  tg.computeVertexNormals(); fold(tg, .18);
   B.add(tg, (x, y) => y < 64 ? [I.hips, I.hips, 0] : y < 71 ? w2('hips', 'spine', smooth(64, 71, y)) : y < 81 ? [I.spine, I.spine, 0] : y < 88 ? w2('spine', 'chest', smooth(81, 88, y)) : [I.chest, I.chest, 0], P.torso);
 
   // лабораторный халат: юбка поверх таза и бёдер
@@ -173,8 +173,8 @@ function bodyGeometry(cfg, sk) {
     const big = (cfg.bigArm === s ? 1.7 : 1) * (1 + mus * .4 + fat * .2) * (1 - thin * .2);
     const sh = V3(sg * 17, 100, 0), el = V3(sg * 18, 77, 1), wr = V3(sg * 18.6, 57, 2);
     const bg2 = cfg.bigArm === s;
-    B.add(alignAlong(fold(bg2 ? taper(7.6, 6.4, 23.1) : taper(5.8 * big, 4.6 * big, 23.1), .45), sh, el), (x, y) => y > 95 ? w2('uarm' + s, 'chest', smooth(95, 101, y) * .55) : [I['uarm' + s], I['uarm' + s], 0], P.arm);
-    B.add(alignAlong(fold(bg2 ? taper(6.6, 9.8, 20.2) : taper(4.6 * big, 3.5 * big, 20.2), .4), el, wr), (x, y) => y > 73 ? w2('farm' + s, 'uarm' + s, smooth(73, 78.5, y) * .5) : [I['farm' + s], I['farm' + s], 0], P.arm);
+    B.add(alignAlong(fold(bg2 ? taper(7.6, 6.4, 23.1) : taper(5.8 * big, 4.6 * big, 23.1), .16), sh, el), (x, y) => y > 95 ? w2('uarm' + s, 'chest', smooth(95, 101, y) * .55) : [I['uarm' + s], I['uarm' + s], 0], P.arm);
+    B.add(alignAlong(fold(bg2 ? taper(6.6, 9.8, 20.2) : taper(4.6 * big, 3.5 * big, 20.2), .14), el, wr), (x, y) => y > 73 ? w2('farm' + s, 'uarm' + s, smooth(73, 78.5, y) * .5) : [I['farm' + s], I['farm' + s], 0], P.arm);
     const hb = I['hand' + s], hk = bg2 ? 1.9 : big > 1.3 ? 1.5 : 1;
     const palm = ellipsoid(3 * hk, 5.8 * hk, 4.3 * hk, 14, 10); palm.translate(sg * 18.7, 51, 2.6); B.add(palm, () => [hb, hb, 0], P.hand);
     const fl = cfg.zombie ? 9.6 : 7.6;
@@ -192,8 +192,8 @@ function bodyGeometry(cfg, sk) {
       B.add(st, (x, y) => y > 55 ? w2('thigh' + s, 'hips', smooth(55, 61, y) * .6) : [I['thigh' + s], I['thigh' + s], 0], P.stump);
       return;
     }
-    B.add(alignAlong(fold(taper(7.4 * lk, 5.6 * lk, 28), .55), hip, kn), (x, y) => y > 55 ? w2('thigh' + s, 'hips', smooth(55, 61, y) * .6) : [I['thigh' + s], I['thigh' + s], 0], P.leg);
-    B.add(alignAlong(fold(taper(5.6 * lk, 3.9 * lk, 24.5), .5), kn, an), (x, y) => y > 28.5 ? w2('shin' + s, 'thigh' + s, smooth(28.5, 34, y) * .5) : [I['shin' + s], I['shin' + s], 0], P.leg);
+    B.add(alignAlong(fold(taper(7.4 * lk, 5.6 * lk, 28), .2), hip, kn), (x, y) => y > 55 ? w2('thigh' + s, 'hips', smooth(55, 61, y) * .6) : [I['thigh' + s], I['thigh' + s], 0], P.leg);
+    B.add(alignAlong(fold(taper(5.6 * lk, 3.9 * lk, 24.5), .18), kn, an), (x, y) => y > 28.5 ? w2('shin' + s, 'thigh' + s, smooth(28.5, 34, y) * .5) : [I['shin' + s], I['shin' + s], 0], P.leg);
     const fb = I['foot' + s];
     const shoe = ellipsoid(5.1, 4.2, 9.6, 18, 12); shoe.translate(sg * 7.7, 4.4, 4.6);
     const shaft = taper(5.3 * lk, 5.1 * lk, 13, 16, 4); shaft.translate(sg * 7.7, 15, .8); B.add(shaft, () => [I['shin' + s], I['foot' + s], .5], P.foot); B.add(shoe, () => [fb, fb, 0], P.foot);
