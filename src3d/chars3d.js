@@ -1,10 +1,9 @@
-// 3D-персонажи поверх 2D-сцены: свои скиннинг-модели героя и зомби, PBR-освещение, анимации.
+// Сцена: 3D-окружение башни + рисованные 2D-персонажи (герой, зомби, звери), свет, тени, пост-обработка.
 import { buildEnv, FY } from './env3d.js';
-import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js';
+import { makePost } from './post.js';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { buildHumanoid, weaponModel } from './humanoid.js';
-import { buildQuadruped } from './quadruped.js';
+import { buildHuman2D, buildQuad2D } from './rig2d.js';
 
 const GL = { ready: false, enabled: true, active: false };
 try { GL.enabled = localStorage.getItem('tower-3d') !== '0'; } catch (e) {}
@@ -19,11 +18,18 @@ GL.box = (name) => {
 };
 
 const VB = { x: 0, y: 24, w: 360, h: 400 };
-const YAW = 0.78;
 const HUMAN_SCALE = 1.05;
 
 // ---------- внешность ----------
-const JACKETS = ['#5e5240', '#3d4f66', '#565e66', '#3a4f3c', '#262e3a', '#33364f'];
+// снаряжение героя по уровню брони: лохмотья → куртка → пластины → кевлар → экзоскелет → нанопластины
+const HERO_GEAR = [
+  { shirt: '#5a5142', torn: .35, x: [] },
+  { shirt: '#3e4636', jacket: '#3e4636', hoodDown: true, x: [] },
+  { shirt: '#4a4336', jacket: '#4a4336', hoodDown: true, x: ['pads'], padCol: '#55595c' },
+  { shirt: '#30373f', jacket: '#30373f', x: ['pads', 'vest'], vest: '#3d4231', pouches: true, padCol: '#2f3337' },
+  { shirt: '#2c3036', jacket: '#2c3036', x: ['pads', 'vest', 'exo'], vest: '#2b2f33', pouches: true, padCol: '#3a3f44' },
+  { shirt: '#1f232a', jacket: '#1f232a', x: ['vest', 'nano'], vest: '#191c22', pouches: true },
+];
 // Параметры внешности всех 35 врагов: q — четвероногий, style — тип скелета и анимаций
 export const ZOMBIES = {
   'Крыса-переросток': { q: 1, fur: '#5b4a3c', ears: 'round', snout: 1.15, tailCol: '#c99a96', tailLen: 2.2, tailK: .6, scale: .55, long: 1.15, legK: .8, eye: '#ff3d2e', speed: 1.4 },
@@ -65,101 +71,72 @@ export const ZOMBIES = {
 const hashName = s => { let h = 7; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h % 997 + 1; };
 
 function heroModel(wi, ai) {
-  const x = ['cap', 'scarf', 'backpack']; if (ai >= 2) x.push('pads'); if (ai >= 4) x.push('stripes');
-  const m = buildHumanoid({ style: 'hero', zombie: false, seed: 11, skin: '#e0b896', shirt: JACKETS[ai] || JACKETS[0], pants: '#2f343f', shoes: '#2a2420', hair: '#3a2a1c',
-    sleeves: 'long', torn: ai === 0 ? .25 : .05, blood: .08, x, hat: '#2c364b', padCol: ai >= 4 ? '#2a3140' : '#5a6372', stripe: ai >= 5 ? '#a66bff' : '#59e1ff' });
-  const w = weaponModel(wi);
-  w.position.set(-.2, -7.6, 3.2); w.rotation.set(Math.PI / 2 - .35, 0, 0);
-  m.hand.add(w);
-  m.group.scale.setScalar(HUMAN_SCALE);
+  const g = HERO_GEAR[ai] || HERO_GEAR[0];
+  const cfg = Object.assign({ style: 'hero', zombie: false, seed: 11, skin: '#c99c7c', pants: '#34362f', shoes: '#2a221c', hair: '#2b2119', stubble: true, sleeves: 'long', torn: .06, blood: .12 }, g, { x: ['pack', ...g.x] });
+  const m = buildHuman2D(cfg, wi);
+  m.group.scale.setScalar(HUMAN_SCALE); m.cfg = cfg;
   return m;
 }
 function enemyModel(name) {
   const cfg = Object.assign({ zombie: true, seed: hashName(name) }, ZOMBIES[name] || ZOMBIES['Сборщик']);
-  const m = cfg.q ? buildQuadruped(cfg) : buildHumanoid(cfg);
+  if (cfg.coat) cfg.coatCol = cfg.shirt;
+  const m = cfg.q ? buildQuad2D(cfg) : buildHuman2D(cfg, 0);
   m.group.scale.setScalar((cfg.scale || 1) * (cfg.q ? 1 : HUMAN_SCALE));
   m.cfg = cfg;
   return m;
 }
 
-// ---------- анимации ----------
-function controller(model) {
-  const mixer = new THREE.AnimationMixer(model.group), acts = {};
-  for (const [n, c] of Object.entries(model.clips)) acts[n] = mixer.clipAction(c);
-  ['attack', 'hit', 'death'].forEach(n => { if (acts[n]) { acts[n].setLoop(THREE.LoopOnce, 1); acts[n].clampWhenFinished = true; } });
-  let base = 'idle', cur = acts.idle, oneshot = null;
-  cur.play();
-  const fade = (to, t = .18) => { if (to === cur) return; to.reset().setEffectiveWeight(1).fadeIn(t).play(); if (cur) cur.fadeOut(t); cur = to; };
-  mixer.addEventListener('finished', e => { if (e.action === acts[oneshot] && oneshot !== 'death') { oneshot = null; fade(acts[base], .22); } });
-  return {
-    mixer,
-    loop(n) { if (!acts[n] || base === n) return; base = n; if (!oneshot) fade(acts[n]); },
-    once(n) { if (!acts[n] || oneshot === 'death') return; oneshot = n; fade(acts[n], n === 'death' ? .15 : .08); },
-    reset() { oneshot = null; base = 'idle'; mixer.stopAllAction(); cur = acts.idle; cur.reset().play(); },
-    get dead() { return oneshot === 'death'; },
-  };
-}
-
 // ---------- сцена ----------
-let renderer, scene, camera, canvas, hostEl, pmrem;
-// ---------- комикс-стиль: ступенчатая заливка и жирный контур ----------
-let RAMP = null, effect = null;
-const TOONS = new WeakMap();
-function toonMat(m, outline) {
-  if (m.isMeshToonMaterial) return m;
-  if (TOONS.has(m)) return TOONS.get(m);
-  RAMP = RAMP || Object.assign(new THREE.DataTexture(new Uint8Array([120, 170, 220, 255]), 4, 1, THREE.RedFormat), { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, needsUpdate: true });
-  let map = m.map, col = m.color;
-  if (map && map.userData.surf && map.image) {            // фактурные текстуры -> плоский средний цвет (комикс)
-    let src = map.image, w = src.width || 256;
-    while (w > 1) { w = Math.max(1, w >> 1); const c = document.createElement('canvas'); c.width = c.height = w; const cx = c.getContext('2d'); cx.imageSmoothingQuality = 'high'; cx.drawImage(src, 0, 0, w, w); src = c; }
-    const d = src.getContext('2d').getImageData(0, 0, 1, 1).data; col = new THREE.Color().setRGB(d[0] / 255, d[1] / 255, d[2] / 255, THREE.SRGBColorSpace).multiply(m.color); map = null; col.multiplyScalar(2.1);
-  }
-  const n = new THREE.MeshToonMaterial({ color: col, map, vertexColors: m.vertexColors, emissive: m.emissive, emissiveIntensity: m.emissiveIntensity, transparent: m.transparent, opacity: m.opacity, side: m.side, depthWrite: m.depthWrite, gradientMap: RAMP });
-  n.userData.outlineParameters = outline ? { thickness: .0075, color: [0, 0, 0], alpha: 1, visible: true } : { visible: false };
-  TOONS.set(m, n); return n;
-}
-function toonify(root, outline) {
-  root.traverse(o => {
-    if (!o.material) return;
-    if ((o.isMesh || o.isSkinnedMesh) && [].concat(o.material).every(m => m.isMeshStandardMaterial || m.isMeshToonMaterial)) o.material = Array.isArray(o.material) ? o.material.map(m => toonMat(m, outline)) : toonMat(o.material, outline);
-    else [].concat(o.material).forEach(m => { m.userData.outlineParameters = { visible: false }; });
-  });
-}
-let env = null, envKey = '', keyLight = null;
+let renderer, scene, camera, canvas, hostEl, pmrem, post = null;
+let env = null, envKey = '', keyLight = null, hurt = 0;
 let hero = null, foe = null, dying = [], heroKey = '', foeKey = '', view = '', lastDraw = 0;
+// качество: high — HDR, MSAA, свечение, цветокоррекция, тени; low — прямой рендер без теней
+GL.quality = 'high';
+try { GL.quality = localStorage.getItem('tower-q') || 'high'; } catch (e) {}
 
 function shadowTex() {
   const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
-  const g = x.createRadialGradient(32, 32, 2, 32, 32, 30); g.addColorStop(0, 'rgba(0,0,0,.6)'); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+  const g = x.createRadialGradient(32, 32, 2, 32, 32, 30); g.addColorStop(0, 'rgba(0,0,0,.75)'); g.addColorStop(.5, 'rgba(0,0,0,.35)'); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64);
   return new THREE.CanvasTexture(c);
 }
 let SHT = null;
 function holder(model, w) {
   const root = new THREE.Group(), flip = new THREE.Group(), yaw = new THREE.Group();
-  root.add(flip); flip.add(yaw); yaw.rotation.y = YAW; yaw.add(model.group); model.group.traverse(o => { if (o.isMesh || o.isSkinnedMesh) o.castShadow = true; });
+  root.add(flip); flip.add(yaw); yaw.add(model.group);
   SHT = SHT || shadowTex();
-  const sh = new THREE.Mesh(new THREE.PlaneGeometry(w * 2.4, w * .7), new THREE.MeshBasicMaterial({ map: SHT, transparent: true, depthWrite: false }));
-  sh.position.set(0, 1, -30); root.add(sh);
-  return { root, flip, yaw, model, ctl: controller(model), st: { atk: -1, flash: 0, dir: 1, pop: 0 } };
+  // мягкая контактная тень под ногами (дополняет карту теней)
+  const sh = new THREE.Mesh(new THREE.PlaneGeometry(w * 2.2, w * 1.3), new THREE.MeshBasicMaterial({ map: SHT, transparent: true, depthWrite: false }));
+  sh.rotation.x = -Math.PI / 2; sh.position.set(0, .6, 0); sh.renderOrder = 1; root.add(sh);
+  return { root, flip, yaw, model, ctl: model.ctl, st: { atk: -1, flash: 0, dir: 1, pop: 0 } };
 }
-function setFlash(h, f) { h.model.mats.forEach(m => { if (m.emissive && !m.userData.glow) { m.emissive.setRGB(f * .55, f * .06, f * .05); m.emissiveIntensity = 1; } }); }
+function setFlash(h, f) { h.model.mats.forEach(m => { if (m.userData.glow) return; const b = m.userData.baseEmissive || 0; m.emissive.setRGB(b + f * 1.6, b * (1 - f * .7), b * (1 - f * .75)); }); }
+const animate = (h, dt) => h.model.apply(h.ctl.pose(dt));
 function disposeHolder(h) {
   if (!h) return; scene.remove(h.root);
   h.root.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) [].concat(o.material).forEach(m => m.dispose()); });
 }
-function toonModel(model) { toonify(model.group, true); model.mats = model.mats.map(m => toonMat(m, true)); }
-function markGlows(model) { model.group.traverse(o => { if (o.material && o.material.emissiveIntensity > 1) o.material.userData.glow = true; }); model.mats.forEach(m => { if (m.emissiveIntensity > 1) m.userData.glow = true; }); }
 
+function applyQuality() {
+  const hi = GL.quality !== 'low';
+  renderer.shadowMap.enabled = hi; renderer.shadowMap.needsUpdate = true;
+  if (keyLight) keyLight.castShadow = hi;
+  scene.traverse(o => { if (o.material) [].concat(o.material).forEach(m => { m.needsUpdate = true; }); });
+  if (hi && !post) post = makePost(renderer, scene, camera);
+  view = '';
+}
 function setupView() {
   const r = hostEl.getBoundingClientRect(), W = Math.max(1, r.width), H = Math.max(1, r.height);
-  const key = W + 'x' + H; if (key === view) return; view = key;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75)); renderer.setSize(W, H, false);
-  const sc = Math.min(W / VB.w, H / VB.h), offX = (W - VB.w * sc) / 2, offY = H - VB.h * sc;
-  const xmin = VB.x - offX / sc, ytop = VB.y - offY / sc;
-  const wv = W / sc, hv = H / sc, D = 1100;
-  camera.fov = 2 * Math.atan(hv / 2 / D) * 180 / Math.PI; camera.aspect = W / H; camera.near = 50; camera.far = 3000;
-  camera.position.set(xmin + wv / 2, -(ytop + hv / 2), D); camera.lookAt(xmin + wv / 2, -(ytop + hv / 2), 0); camera.updateProjectionMatrix();
+  const key = W + 'x' + H;
+  if (key !== view) {
+    view = key;
+    const hi = GL.quality !== 'low', pr = Math.min(window.devicePixelRatio || 1, hi ? 1.6 : 1.1);
+    renderer.setPixelRatio(pr); renderer.setSize(W, H, false);
+    if (hi && post) post.setSize(W, H, pr);
+  }
+  // окно мира задаёт камера сцены (scene.js): SVG-слои и WebGL видят одно и то же
+  const V = window.VIEW || VB, D = 1100, cx = V.x + V.w / 2, cy = -(V.y + V.h / 2);
+  camera.fov = 2 * Math.atan(V.h / 2 / D) * 180 / Math.PI; camera.aspect = W / H; camera.near = 50; camera.far = 3000;
+  camera.position.set(cx, cy, D); camera.lookAt(cx, cy, 0); camera.updateProjectionMatrix();
 }
 function trackHero() {
   const el = document.getElementById('hero'); if (!el || !hero) return;
@@ -182,7 +159,7 @@ function frame(ts) {
     if (s.atk >= 0) { s.atk += dt / .55; if (s.atk >= 1) s.atk = -1; }
     if (s.flash > 0) s.flash = Math.max(0, s.flash - dt * 3); setFlash(hero, s.flash);
     hero.yaw.position.x = s.atk >= 0 ? Math.sin(Math.PI * Math.min(1, s.atk * 1.4)) * 38 : 0;
-    hero.ctl.mixer.update(dt);
+    animate(hero, dt);
   }
   if (foe) {
     const s = foe.st; s.pop = Math.min(1, s.pop + dt * 4);
@@ -190,18 +167,17 @@ function frame(ts) {
     if (s.flash > 0) s.flash = Math.max(0, s.flash - dt * 3); setFlash(foe, s.flash);
     foe.yaw.position.x = s.atk >= 0 ? Math.sin(Math.PI * s.atk) * 40 : 0;
     const k = 1 - Math.pow(1 - s.pop, 3); foe.root.scale.set(k, k, k);
-    foe.ctl.mixer.update(dt);
+    animate(foe, dt);
   }
   dying = dying.filter(d => {
-    d.ctl.mixer.update(dt); d.left -= dt;
+    animate(d, dt); d.left -= dt;
     if (d.left < .4) d.root.traverse(o => { if (o.material) [].concat(o.material).forEach(m => { m.transparent = true; m.opacity = Math.max(0, d.left / .4); }); });
     if (d.left <= 0) { disposeHolder(d); return false; } return true;
   });
-  if (env) {
-    env.update(dt, [0, 1, 2].map(i => document.getElementById('door' + i)), document.getElementById('lift'));
-    if (keyLight) { const hx = hero ? hero.root.position.x : 180; keyLight.position.set(hx - 90, 300, 380); keyLight.target.position.set(hx, FY, 0); keyLight.target.updateMatrixWorld(); }
-  }
-  effect.render(scene, camera);
+  if (env) env.update(dt, [0, 1, 2].map(i => document.getElementById('door' + i)), document.getElementById('lift'));
+  if (keyLight) { const hx = hero ? hero.root.position.x : 180; keyLight.position.set(hx - 70, FY + 520, 420); keyLight.target.position.set(hx + 20, FY, 0); keyLight.target.updateMatrixWorld(); }
+  hurt = Math.max(0, hurt - dt * 1.6);
+  if (GL.quality !== 'low' && post) post.render(t, hurt); else renderer.render(scene, camera);
 }
 GL.update = (o) => {
   if (!GL.ready) return;
@@ -210,18 +186,18 @@ GL.update = (o) => {
   if (o.env !== envKey) {
     envKey = o.env || '';
     if (env) { scene.remove(env.root); env.dispose(); env = null; }
-    if (envKey) { try { env = buildEnv(envKey); toonify(env.root, false); scene.add(env.root); } catch (e) { console.error(e); env = null; } }
-    hostEl.classList.toggle('env', !!env);
+    if (envKey) { try { env = buildEnv(envKey); scene.add(env.root); } catch (e) { console.error(e); env = null; } }
   }
+  hostEl.classList.toggle('env', !!env);
   const hk = o.wi + ':' + o.ai;
-  if (hk !== heroKey) { heroKey = hk; disposeHolder(hero); const m = heroModel(o.wi, o.ai); toonModel(m); markGlows(m); hero = holder(m, 22); scene.add(hero.root); }
+  if (hk !== heroKey) { heroKey = hk; disposeHolder(hero); const m = heroModel(o.wi, o.ai); hero = holder(m, 22); scene.add(hero.root); }
   if (hero) { if (o.dead) hero.ctl.once('death'); else if (hero.ctl.dead) hero.ctl.reset(); }
   const fk = o.enemy || '';
   if (fk !== foeKey) {
     foeKey = fk;
     if (foe) { if (foe.dyingStarted) { foe.left = 1.5; dying.push(foe); } else disposeHolder(foe); }
     foe = null;
-    if (fk) { const m = enemyModel(fk); toonModel(m); markGlows(m); foe = holder(m, m.cfg.q ? 36 * (m.cfg.scale || 1) : 28); foe.flip.scale.x = -1; foe.st.dir = -1; foe.root.scale.set(0, 0, 0); scene.add(foe.root); }
+    if (fk) { const m = enemyModel(fk); foe = holder(m, m.cfg.q ? 36 * (m.cfg.scale || 1) : 28); foe.flip.scale.x = -1; foe.st.dir = -1; foe.root.scale.set(0, 0, 0); scene.add(foe.root); }
   }
   if (foe) foe.root.position.set(o.foeX, -o.foeY, 0);
 };
@@ -231,48 +207,58 @@ GL.setEnabled = (v) => {
   if (hostEl) hostEl.classList.toggle('gl', GL.ready && GL.enabled);
   if (canvas) canvas.style.display = GL.ready && GL.enabled ? '' : 'none';
 };
+GL.setQuality = (q) => {
+  GL.quality = q === 'low' ? 'low' : 'high';
+  try { localStorage.setItem('tower-q', GL.quality); } catch (e) {}
+  if (renderer) applyQuality();
+};
 GL.trigger = (who, kind) => {
   if (!GL.ready || !GL.enabled) return;
   const h = who === 'hero' ? hero : foe; if (!h) return;
   if (kind === 'attack') { h.st.atk = 0; h.ctl.once('attack'); }
-  else if (kind === 'hurt') { h.st.flash = 1; h.ctl.once('hit'); }
+  else if (kind === 'hurt') { h.st.flash = 1; h.ctl.once('hit'); if (who === 'hero') hurt = 1; }
   else if (kind === 'death') { h.dyingStarted = true; h.ctl.once('death'); }
 };
 function lights(sc) {
-  sc.add(new THREE.HemisphereLight(0xaab8d0, 0x4a3c30, 1.9));
-  const key = new THREE.DirectionalLight(0xffe4bc, 2.4); key.position.set(-140, 260, 320); sc.add(key, key.target);
-  key.castShadow = true; key.shadow.mapSize.set(1024, 1024); key.shadow.bias = -.0004; key.shadow.normalBias = .6;
-  Object.assign(key.shadow.camera, { left: -230, right: 230, top: 260, bottom: -120, near: 50, far: 1200 }); keyLight = key;
-  const rim = new THREE.DirectionalLight(0x7fb0ff, 2.2); rim.position.set(220, 140, -260); sc.add(rim);
-  const fill = new THREE.DirectionalLight(0xffb070, .5); fill.position.set(200, 40, 200); sc.add(fill);
+  sc.add(new THREE.HemisphereLight(0x8f9cb8, 0x2a2018, .65));
+  // ключевой тёплый свет сверху-спереди: тени персонажей на пол и стену
+  const key = new THREE.DirectionalLight(0xffdcb0, 1.9); key.position.set(-140, 260, 320); sc.add(key, key.target);
+  key.castShadow = true; key.shadow.mapSize.set(1024, 1024); key.shadow.bias = -.0005; key.shadow.normalBias = .8; key.shadow.radius = 4;
+  Object.assign(key.shadow.camera, { left: -260, right: 260, top: 300, bottom: -200, near: 100, far: 1500 }); keyLight = key;
+  // холодный контровой свет: читаемый силуэт на тёмном фоне
+  const rim = new THREE.DirectionalLight(0x8cb4ff, 2.6); rim.position.set(240, 160, -300); sc.add(rim);
+  const rim2 = new THREE.DirectionalLight(0xffb27a, .9); rim2.position.set(-260, 80, -200); sc.add(rim2);
 }
-function setupRenderer(r) { r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap; r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.NoToneMapping; }
+function setupRenderer(r) { r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFShadowMap; r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.1; }
 GL.init = () => {
   try {
     hostEl = document.getElementById('scene'); canvas = document.getElementById('gl');
-    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
-    renderer.setClearColor(0x000000, 0); setupRenderer(renderer);
-    scene = new THREE.Scene(); effect = new OutlineEffect(renderer, { defaultThickness: .0075, defaultColor: [0, 0, 0], defaultAlpha: 1 });
-    pmrem = new THREE.PMREMGenerator(renderer); scene.environment = pmrem.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .55;
+    if (!hostEl || !canvas) return;
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
+    renderer.setClearColor(0x050608, 1); setupRenderer(renderer);
+    scene = new THREE.Scene();
+    pmrem = new THREE.PMREMGenerator(renderer); scene.environment = pmrem.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .35;
     camera = new THREE.PerspectiveCamera(30, .9, 50, 3000);
     lights(scene);
+    applyQuality();
     GL.ready = true; if (GL.enabled) hostEl.classList.add('gl');
     requestAnimationFrame(frame);
     if (typeof render === 'function') render();
-  } catch (e) { GL.ready = false; if (hostEl) hostEl.classList.remove('gl'); }
+  } catch (e) { console.error(e); GL.ready = false; if (hostEl) hostEl.classList.remove('gl'); }
 };
 // отладка и тесты: несколько моделей на отдельном холсте, в нужной анимации и моменте
 GL.gallery = (cv, items, w, h, cols) => {
-  const r = new THREE.WebGLRenderer({ canvas: cv, antialias: true }); r.setSize(w, h, false); setupRenderer(r); r.setClearColor(0x1d2430, 1);
-  const sc = new THREE.Scene(); const pm = new THREE.PMREMGenerator(r); sc.environment = pm.fromScene(new RoomEnvironment(), .04).texture; sc.environmentIntensity = .55; lights(sc);
+  const r = new THREE.WebGLRenderer({ canvas: cv, antialias: true }); r.setSize(w, h, false); setupRenderer(r); r.setClearColor(0x161a20, 1);
+  const sc = new THREE.Scene(); lights(sc); sc.add(new THREE.AmbientLight(0xffffff, .6));
   const cam = new THREE.OrthographicCamera(0, w, 0, -h, 1, 3000); cam.position.z = 900;
   cols = cols || Math.ceil(Math.sqrt(items.length * w / h)); const rows = Math.ceil(items.length / cols), cw = w / cols, ch = h / rows;
   items.forEach((it, i) => {
-    const m = it.hero ? heroModel(it.wi, it.ai) : enemyModel(it.name); toonModel(m);
+    const m = it.hero ? heroModel(it.wi, it.ai) : enemyModel(it.name);
     const hh = holder(m, m.cfg && m.cfg.q ? 36 : 28); hh.flip.scale.x = it.hero ? 1 : -1;
-    const c = i % cols, rr = Math.floor(i / cols); hh.root.position.set(c * cw + cw / 2, -(rr * ch + ch * .9), 0); hh.root.scale.setScalar((it.s || 1) * ch / 175); sc.add(hh.root);
-    const a = hh.ctl.mixer.clipAction(m.clips[it.anim || 'idle']); hh.ctl.mixer.stopAllAction(); a.play(); hh.ctl.mixer.setTime(it.t || .4);
+    const c = i % cols, rr = Math.floor(i / cols); hh.root.position.set(c * cw + cw / 2, -(rr * ch + ch * .92), 0); hh.root.scale.setScalar((it.s || 1) * ch / 165); sc.add(hh.root);
+    if (it.anim && it.anim !== 'idle' && it.anim !== 'walk') hh.ctl.once(it.anim); else hh.ctl.loop(it.anim || 'idle');
+    for (let t = 0; t < (it.t || .4); t += 1 / 60) animate(hh, 1 / 60);
   });
-  new OutlineEffect(r, { defaultThickness: .0075, defaultColor: [0, 0, 0], defaultAlpha: 1 }).render(sc, cam); return true;
+  r.render(sc, cam); return true;
 };
 document.addEventListener('DOMContentLoaded', GL.init);

@@ -1,0 +1,57 @@
+'use strict';
+// ===== Свои линейные иконки интерфейса (вместо эмодзи): 24×24, обводка currentColor =====
+const ICO = {
+  bag: '<path d="M9 6V4.5a3 3 0 0 1 6 0V6"/><path d="M5 9a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/><path d="M8.5 13h7v4h-7z"/><path d="M5 12h3M16 12h3"/>',
+  craft: '<path d="M14.5 5.5a4 4 0 0 0-5 5L3.5 16.5l3 3 6-6a4 4 0 0 0 5-5l-2.4 2.4-2.6-.4-.4-2.6z"/><path d="M15 15l5 5"/>',
+  skills: '<path d="M12 3l2.6 5.5 6 .8-4.4 4.2 1.1 6L12 16.6 6.7 19.5l1.1-6L3.4 9.3l6-.8z"/>',
+  diary: '<path d="M6 3h11a2 2 0 0 1 2 2v16H8a2 2 0 0 1-2-2z"/><path d="M6 17a2 2 0 0 1 2-2h11"/><path d="M10 7h5M10 10h4"/>',
+  trophy: '<path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5.5A2.5 2.5 0 0 0 8 10.5M16 6h2.5A2.5 2.5 0 0 1 16 10.5"/><path d="M12 13v3.5M8.5 20h7M9.5 16.5h5V20h-5z"/>',
+  home: '<path d="M3 11.5L12 4l9 7.5"/><path d="M5.5 10v10h13V10"/><path d="M10 20v-5.5h4V20"/>',
+  help: '<circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 1 1 3.4 2.3c-.7.3-1 .8-1 1.5v.6"/><path d="M12 16.8v.4"/>',
+  bed: '<path d="M3 19V6M3 15h18v4M21 15v-3a3 3 0 0 0-3-3h-7v6"/><circle cx="7" cy="11.5" r="2"/>',
+  pan: '<circle cx="10" cy="14" r="6"/><path d="M16 14h6"/><path d="M8 6.5c0-1 1-1 1-2M12 6.5c0-1 1-1 1-2"/>',
+  up: '<path d="M12 20V5M6 11l6-6 6 6"/>',
+  shield: '<path d="M12 3l8 3v6c0 5-3.6 8-8 9-4.4-1-8-4-8-9V6z"/><path d="M12 7v10"/>',
+  run: '<circle cx="15" cy="4.5" r="1.8"/><path d="M8 21l3-5.5 3 2V22M6 11.5l3.5-4h5l2 4 3 .8M11 15.5l2-6"/>',
+  grenade: '<circle cx="11" cy="14.5" r="6.5"/><path d="M8.5 8.4V6h5v2.4M13.5 6l3.5-2.5M17 10l3-1"/><path d="M8 13h6M8 16h6"/>',
+  food: '<path d="M6 7h12v12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/><path d="M6 7l1-3h10l1 3M6 11h12M6 17h12"/>',
+  bandage: '<g transform="rotate(-40 12 12)"><rect x="2" y="8.5" width="20" height="7" rx="3.5"/><path d="M9 8.5v7M15 8.5v7"/></g><path d="M11 11.5h.01M13 13.5h.01"/>',
+  medkit: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5h6v2M12 10.5v6M9 13.5h6"/>',
+  stim: '<path d="M17.5 3.5l3 3M16 5l3 3M17.5 6.5L9 15l-3 1 1-3 8.5-8.5M10.5 10.5l3 3M3.5 20.5l3-3"/>',
+  meal: '<path d="M3 11h18a9 9 0 0 1-18 0z"/><path d="M8 7.5c0-1 1-1 1-2.2M12 7.5c0-1 1-1 1-2.2M16 7.5c0-1 1-1 1-2.2"/>',
+  spark: '<path d="M13 2L5 13.5h6l-1 8.5 8-11.5h-6z"/>',
+  power: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"/>',
+  eye: '<path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  fast: '<path d="M4 6l7 6-7 6zM12.5 6l7 6-7 6z"/>',
+  sound: '<path d="M4 9.5h4l5-4v13l-5-4H4z"/><path d="M16.5 9a4.5 4.5 0 0 1 0 6M19 6.5a8 8 0 0 1 0 11"/>',
+  mute: '<path d="M4 9.5h4l5-4v13l-5-4H4z"/><path d="M17 9.5l5 5M22 9.5l-5 5"/>',
+  gear: '<circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"/><circle cx="12" cy="12" r="6.5"/>',
+  heart: '<path d="M12 20.5s-8-5-8-11a4.4 4.4 0 0 1 8-2.6 4.4 4.4 0 0 1 8 2.6c0 6-8 11-8 11z"/>',
+  hunger: '<path d="M7 3v7a2 2 0 0 0 4 0V3M9 3v18"/><path d="M16 21V3c2.5 1 4 4 4 8h-4"/>',
+  scrap: '<path d="M12 3l7.8 4.5v9L12 21l-7.8-4.5v-9z"/><circle cx="12" cy="12" r="3"/>',
+  cloth: '<path d="M7 4h10M7 20h10M8.5 4v16M15.5 4v16"/><path d="M8.5 8l7 2.5M8.5 12l7 2.5M8.5 16l7 2"/>',
+  chem: '<path d="M9.5 3h5M10.5 3v6l-5.2 8.8A2 2 0 0 0 7 21h10a2 2 0 0 0 1.7-3.2L13.5 9V3"/><path d="M7.4 15h9.2"/>',
+  meat: '<path d="M14 4a6 6 0 0 1 6 6c0 4-3.6 6-7 6l-3 3a1.8 1.8 0 1 1-2.6 2.4 1.8 1.8 0 1 1-2.4-2.6 1.8 1.8 0 1 1 2.6-2.4L10.5 13c0-3.5 1-9 3.5-9z"/>',
+  herbs: '<path d="M5 19C5 10 11 4.5 20 4.5c0 9-6 14.5-15 14.5z"/><path d="M5 19l8.5-8.5"/>',
+  shroom: '<path d="M3.5 12a8.5 6.5 0 0 1 17 0z"/><path d="M9.5 12v5.5a2.5 2.5 0 0 0 5 0V12"/>',
+  key: '<circle cx="7.5" cy="12" r="4"/><path d="M11.5 12H21M18 12v3M15 12v2.2"/>',
+  skull: '<path d="M12 3a7.5 7.5 0 0 0-7.5 7.5c0 2.8 1.4 4.4 3 5.4V20h9v-4.1c1.6-1 3-2.6 3-5.4A7.5 7.5 0 0 0 12 3z"/><circle cx="9" cy="11" r="1.6"/><circle cx="15" cy="11" r="1.6"/><path d="M10.5 20v-2M13.5 20v-2"/>',
+  drop: '<path d="M12 3s6 7 6 11a6 6 0 0 1-12 0c0-4 6-11 6-11z"/>',
+  phone: '<rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18h2"/>',
+  door: '<path d="M5 21V4h11v17M3 21h18"/><path d="M13 12.5h.01"/>',
+  crate: '<path d="M3 8l9-4 9 4v9l-9 4-9-4z"/><path d="M3 8l9 4 9-4M12 12v9M7.5 6l9 4"/>',
+  warn: '<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.4"/>',
+  case: '<path d="M5 7h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z"/><path d="M9 7V4.5h6V7M3 12.5h18"/>',
+  cup: '<path d="M6 7.5h12l-1.6 13.5H7.6z"/><path d="M5 7.5h14M13 7.5l1.6-4.5H18"/>',
+  lock: '<path d="M6 11h12v10H6z"/><path d="M8.5 11V8a3.5 3.5 0 0 1 7 0v3M12 15v2.5"/>',
+  lift: '<rect x="5" y="3" width="14" height="18" rx="1"/><path d="M12 3v18M8.5 8.5l1.5-2 1.5 2M12.5 15.5l1.5 2 1.5-2"/>',
+};
+// эмодзи старого интерфейса -> иконка
+const EMOJI_ICO = { '🎒': 'bag', '🛠': 'craft', '⭐': 'skills', '📖': 'diary', '🏆': 'trophy', '🏠': 'home', '❓': 'help', '🛏': 'bed', '🍳': 'pan', '⬆': 'up',
+  '🛡': 'shield', '🏃': 'run', '💣': 'grenade', '🍖': 'food', '🩹': 'bandage', '💉': 'medkit', '⚡': 'stim', '🍲': 'meal', '✨': 'power',
+  '🔩': 'scrap', '🧵': 'cloth', '🧪': 'chem', '🥩': 'meat', '🌿': 'herbs', '🍄': 'shroom', '🔑': 'key', '☠️': 'skull', '🩸': 'drop', '📞': 'phone' };
+function ico(name, cls = '') {
+  const k = ICO[name] ? name : EMOJI_ICO[name];
+  if (!k) return name;
+  return `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICO[k]}</svg>`;
+}

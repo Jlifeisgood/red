@@ -237,7 +237,7 @@ const vib = p => { if (vibOn && navigator.vibrate) { try { navigator.vibrate(p);
 function setMuted(m) {
   muted = m;
   try { localStorage.setItem('tower-mute', m ? '1' : '0'); } catch (e) {}
-  $('mute').textContent = m ? '🔇' : '🔊';
+  $('mute').innerHTML = ico(m ? 'mute' : 'sound');
 }
 $('mute').onclick = () => { setMuted(!muted); sfx('click'); };
 setMuted(muted);
@@ -1058,7 +1058,7 @@ function dk(icon, label, fn, o = {}) {
   const b = document.createElement('button');
   b.className = 'dk' + (o.cls ? ' ' + o.cls : '');
   b.disabled = !!o.disabled;
-  b.innerHTML = `<span class="ic">${icon}</span><span>${label}</span>` + (o.sub ? `<span class="sub">${o.sub}</span>` : '') + (o.badge ? `<i class="bd">${o.badge}</i>` : '');
+  b.innerHTML = `<span class="ic">${ico(icon)}</span><span class="lb">${label}</span>` + (o.sub ? `<span class="sub">${o.sub}</span>` : '') + (o.badge ? `<i class="bd">${o.badge}</i>` : '');
   b.onclick = () => { sfx('click'); fn(); };
   return b;
 }
@@ -1115,26 +1115,28 @@ function layoutUI() {
 function slotBtn(icon, name, count, fn, disabled, mat) {
   const b = document.createElement('button');
   b.className = 'slot' + (mat ? ' mat' : ''); b.disabled = !!disabled && !mat;
-  b.innerHTML = `<span class="si">${icon}</span><span>${name}</span>${count !== '' ? `<i>${count}</i>` : ''}`;
+  b.innerHTML = `<span class="si">${ico(icon)}</span><span>${name}</span>${count !== '' ? `<i>${count}</i>` : ''}`;
   if (fn) b.onclick = () => { sfx('click'); fn(); };
   return b;
 }
 
 function render() {
   checkAch();
-  $('floor').textContent = S.inBase ? 'Убежище' : `Этаж ${S.floor} / ${TOP}`;
+  $('floor').innerHTML = S.inBase ? '<b class="word">Убежище</b>' : `<small>этаж</small><b>${S.floor}</b><i>/${TOP}</i>`;
   $('zone').textContent = `${S.cycle ? 'Круг ' + (S.cycle + 1) + ' · ' : ''}${S.inBase ? 'под этажом ' + S.floor : ZONES[zoneOf(S.floor)].name} · рекорд ${best || 1}`;
   $('b-hp').style.width = (S.hp / S.maxHp * 100) + '%';
   $('b-en').style.width = (S.en / S.maxEn * 100) + '%';
   $('b-xp').style.width = (S.xp / (S.lvl * 20) * 100) + '%';
-  $('t-hp').textContent = `${S.hp}/${S.maxHp}`;
-  $('t-en').textContent = `${S.en}/${S.maxEn}`;
+  $('t-hp').innerHTML = `${S.hp}<small>/${S.maxHp}</small>`;
+  $('t-en').innerHTML = `${S.en}<small>/${S.maxEn}</small>`;
+  $('hud-l').classList.toggle('low', S.hp <= S.maxHp * .3); $('hud-l').classList.toggle('starve', S.en <= S.maxEn * .2);
   $('lvl').textContent = S.lvl;
   $('t-xp').textContent = `${S.xp}/${S.lvl * 20}`;
-  $('quest').textContent = S.quest ? `📞 до этажа ${S.quest.floor}` : '';
+  $('quest').innerHTML = S.quest ? `${ico('phone')} до этажа ${S.quest.floor}` : '';
   $('inv').innerHTML =
-    `<span>🔩${S.scrap}</span><span>🧵${S.cloth}</span><span>🧪${S.chem}</span><span>🥩${S.meat}</span><span>🌿${S.herbs}</span><span>🍄${S.shrooms}</span><span>🔑${S.keys}</span>` +
-    (S.poison ? '<span style="color:var(--hp)">☠️яд</span>' : '') + (S.bleed ? '<span style="color:var(--hp)">🩸кровь</span>' : '');
+    [['scrap', S.scrap, 'Хлам'], ['cloth', S.cloth, 'Ткань'], ['chem', S.chem, 'Химия'], ['meat', S.meat, 'Мясо'], ['herbs', S.herbs, 'Травы'], ['shroom', S.shrooms, 'Грибы'], ['key', S.keys, 'Ключи']]
+      .filter(r => r[1] > 0).map(([k, n, t]) => `<span title="${t}">${ico(k)}${n}</span>`).join('') +
+    (S.poison ? `<span class="bad">${ico('skull')}яд</span>` : '') + (S.bleed ? `<span class="bad">${ico('drop')}кровь</span>` : '');
 
   renderScene();
 
@@ -1196,7 +1198,9 @@ function render() {
       head(a, 'Настройки. Сохранение идёт автоматически; здесь его можно перенести на другое устройство или после переустановки.');
       a.appendChild(btn(`🔊 Звук: ${muted ? 'выкл' : 'вкл'}`, () => { setMuted(!muted); render(); }, 'full'));
       a.appendChild(btn(`📳 Вибрация: ${vibOn ? 'вкл' : 'выкл'}`, () => { setVib(!vibOn); vib(30); render(); }, 'full'));
-      a.appendChild(btn(window.GL3D && GL3D.ready ? `🎮 Графика: ${GL3D.enabled ? '3D' : '2D (облегчённая)'}` : '🎮 Графика: 2D (3D недоступно на этом устройстве)', () => { if (window.GL3D && GL3D.ready) { GL3D.setEnabled(!GL3D.enabled); render(); } }, 'full', !(window.GL3D && GL3D.ready)));
+      { const G = window.GL3D, ok = G && G.ready, mode = !ok || !G.enabled ? 'svg' : G.quality === 'low' ? 'low' : 'high';
+        const NAMES = { high: 'высокая (свет, тени, эффекты)', low: 'быстрая (без эффектов и теней)', svg: ok ? 'минимальная (плоская)' : 'минимальная (WebGL недоступен)' };
+        a.appendChild(btn(`🎮 Графика: ${NAMES[mode]}`, () => { if (!ok) return; if (mode === 'high') G.setQuality('low'); else if (mode === 'low') G.setEnabled(false); else { G.setEnabled(true); G.setQuality('high'); } render(); }, 'full', !ok)); }
       a.appendChild(btn(`🔠 Размер текста: ${FONTS[fontIdx][0]}`, () => { setFont((fontIdx + 1) % FONTS.length); render(); }, 'full'));
       a.appendChild(btn('📤 Экспорт сохранения', () => { transferMode = 'export'; transferMsg = ''; S.screen = 'transfer'; render(); }));
       a.appendChild(btn('📥 Импорт сохранения', () => { transferMode = 'import'; transferMsg = ''; S.screen = 'transfer'; render(); }));
@@ -1352,6 +1356,8 @@ try {
 
 // ---------- старт ----------
 initScene();
+$('btn-hl').innerHTML = ico('eye'); $('btn-fast').innerHTML = ico('fast'); $('btn-set').innerHTML = ico('gear'); $('i-hp').innerHTML = ico('heart'); $('i-en').innerHTML = ico('hunger');
+$('log').onclick = () => $('log').classList.toggle('open');
 $('btn-hl').onclick = () => { $('sv').classList.toggle('hl'); render(); };
 $('btn-fast').onclick = () => { walkMs = walkMs < 400 ? 520 : 260; try { localStorage.setItem('tower-fast', walkMs < 400 ? '1' : '0'); } catch (e) {} render(); };
 $('btn-set').onclick = () => { if (['map', 'base', 'start'].includes(S.screen)) openSettings(); };

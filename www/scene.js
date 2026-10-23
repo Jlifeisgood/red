@@ -15,8 +15,42 @@ try { if (localStorage.getItem('tower-fast') === '1') walkMs = 260; } catch (e) 
 
 const $svg = id => document.getElementById(id);
 
+// ---------- камера: окно мира (координаты SVG), общее для SVG-слоёв и WebGL ----------
+// Сцена во весь экран: этаж в разрезе, камера плавно следует за героем, в бою — центр между бойцами.
+const VIEW = { x: 0, y: 24, w: 360, h: 400 };
+window.VIEW = VIEW;
+const CAM = { cx: null, under: null, last: 0, key: '' };
+function heroLiveX() {
+  const el = document.getElementById('hero'); if (!el) return heroX;
+  const t = getComputedStyle(el).transform;
+  return t && t !== 'none' ? new DOMMatrix(t).m41 : heroX;
+}
+function camTick(ts) {
+  requestAnimationFrame(camTick);
+  const sc = document.getElementById('scene'); if (!sc) return;
+  const W = sc.clientWidth, Hp = sc.clientHeight; if (!W || !Hp) return;
+  const dt = Math.min(.1, CAM.last ? (ts - CAM.last) / 1000 : .016); CAM.last = ts;
+  const fight = typeof S !== 'undefined' && S && S.screen === 'fight';
+  const a = W / Hp, wv = Math.max(fight ? 320 : 344, 330 * a), hv = wv / a;
+  const lo = wv / 2 - 8, hi = 360 - wv / 2 + 14;          // весь коридор с лифтом почти целиком в кадре, небольшой сдвиг за героем
+  let target = fight ? (HERO_FIGHT + FOE_X) / 2 + 13 : Math.max(lo, Math.min(hi, heroLiveX() + 40));
+  if (lo > hi) target = 180;
+  if (CAM.cx == null) CAM.cx = target;
+  CAM.cx += (target - CAM.cx) * Math.min(1, dt * 3.2);
+  // нижняя панель (журнал + кнопки) перекрывает низ сцены: пол держим над ней
+  const bot = document.getElementById('bottom'), sheet = document.getElementById('sheet');
+  const px = sheet && sheet.classList.contains('open') ? 150 : Math.max(110, Math.min(260, bot ? bot.offsetHeight : 150));
+  CAM.under = CAM.under == null ? px : CAM.under + (px - CAM.under) * Math.min(1, dt * 4);
+  const under = CAM.under * wv / W;
+  VIEW.w = wv; VIEW.h = hv; VIEW.x = CAM.cx - wv / 2; VIEW.y = HERO_Y + 30 + under - hv;
+  const vb = `${VIEW.x.toFixed(2)} ${VIEW.y.toFixed(2)} ${wv.toFixed(2)} ${hv.toFixed(2)}`;
+  if (vb !== CAM.key) { CAM.key = vb; document.getElementById('sv').setAttribute('viewBox', vb); document.getElementById('ov').setAttribute('viewBox', vb); }
+}
+requestAnimationFrame(camTick);
+
 function initScene() {
   const sv = $('sv');
+  sv.setAttribute('preserveAspectRatio', 'xMidYMid meet'); $('ov').setAttribute('preserveAspectRatio', 'xMidYMid meet');
   sv.innerHTML = ART.defs + '<g id="bg"></g><g id="doors"></g><g id="furns"></g><g id="liftg"></g><g id="foe"><g id="foe-in"><g id="foe-art"></g></g></g><g id="hero"><g id="hero-in"></g></g>';
   $('ov').innerHTML = '<g id="foe-o"><g id="foe-ui"></g><g id="foe-zones"></g></g><g id="fl"></g>';
   const hit = '<rect x="-48" y="-170" width="96" height="170" fill="#fff" fill-opacity="0.001"/>';

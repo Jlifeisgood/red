@@ -4,8 +4,9 @@ import { noise, fbm, setSeed, rand, C, PI } from './util.js';
 import { surface, paint, gradientTex, radialTex } from './textures.js';
 
 const ZW = -8;                                   // плоскость задней стены
-export const FY = -340;                          // уровень пола в мировых координатах
+export const FY = -351;                          // уровень пола в мировых координатах
 const DOORS = [50, 140, 230], LIFT_X = 318, CEIL = 300;
+const ZCUT = 64, SLAB = 26;                      // плоскость разреза здания и толщина перекрытий
 
 const std = (color, o = {}) => new THREE.MeshStandardMaterial(Object.assign({ color: C(color), roughness: .7, metalness: 0 }, o));
 const metal = (color, o = {}) => std(color, Object.assign({ metalness: .85, roughness: .38 }, o));
@@ -31,6 +32,24 @@ function lightCone(x, top, bottom, spread, color = '#ffe2a8', op = .13) {
   const g = new THREE.CylinderGeometry(4, spread, top - bottom, 28, 1, true);
   const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: coneTex(), color: C(color), transparent: true, opacity: op, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
   m.position.set(x, (top + bottom) / 2, ZW + 26); m.renderOrder = 2; return m;
+}
+
+// ---------- значок комнаты над дверью: круглая табличка с линейной иконкой (иконки — из www/icons.js) ----------
+const ROOM_ICO = { '📦': 'crate', '☠': 'skull', '🛏': 'bed', '⚠': 'warn', '🧳': 'case', '❓': 'help', '🥤': 'cup', '🔒': 'lock' };
+const ICON_TEX = {};
+function roomIcon(t) {
+  if (ICON_TEX[t]) return ICON_TEX[t];
+  const name = ROOM_ICO[t], src = name && typeof ICO !== 'undefined' ? ICO[name] : null, danger = name === 'skull' || name === 'warn';
+  return ICON_TEX[t] = paint(96, 96, (x) => {
+    x.beginPath(); x.arc(48, 48, 40, 0, 7); x.fillStyle = danger ? '#2a0c0a' : '#141311'; x.fill(); x.lineWidth = 7; x.strokeStyle = '#000'; x.stroke();
+    x.lineWidth = 2.5; x.strokeStyle = danger ? 'rgba(255,110,80,.6)' : 'rgba(255,230,190,.4)'; x.beginPath(); x.arc(48, 48, 34, 0, 7); x.stroke();
+    if (!src) { x.fillStyle = '#f0e2c0'; x.font = '700 40px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(t === '·' ? '' : t, 48, 52); return; }
+    x.save(); x.translate(18, 18); x.scale(2.5, 2.5); x.strokeStyle = danger ? '#ff7a5a' : '#f2e4c4'; x.lineWidth = 2.1; x.lineCap = 'round'; x.lineJoin = 'round';
+    for (const m of src.matchAll(/<path d="([^"]+)"/g)) x.stroke(new Path2D(m[1]));
+    for (const m of src.matchAll(/<circle cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"/g)) { x.beginPath(); x.arc(+m[1], +m[2], +m[3], 0, 7); x.stroke(); }
+    for (const m of src.matchAll(/<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/g)) x.strokeRect(+m[1], +m[2], +m[3], +m[4]);
+    x.restore();
+  });
 }
 
 // ---------- двери ----------
@@ -71,7 +90,7 @@ function makeDoor(i, style) {
   const spill = new THREE.Mesh(new THREE.PlaneGeometry(88, 100), new THREE.MeshBasicMaterial({ map: gradientTex([[0, 'rgba(255,200,120,.65)'], [1, 'rgba(255,200,120,0)']]), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
   spill.rotation.x = -PI / 2; spill.position.set(0, .4, 44); g.add(spill);
   // значок комнаты
-  const ric = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthWrite: false })); ric.position.set(0, 186, 8); ric.scale.set(22, 22, 1); ric.visible = false; g.add(ric);
+  const ric = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthWrite: false })); ric.position.set(0, 188, 8); ric.scale.set(26, 26, 1); ric.visible = false; g.add(ric);
   let amt = 0, icon = '';
   return {
     group: g,
@@ -85,7 +104,7 @@ function makeDoor(i, style) {
       const t = el ? (el.querySelector('.ric') || {}).textContent || '' : '';
       if (t !== icon) {
         icon = t; ric.visible = !!t;
-        if (t) { const tex = paint(64, 64, (x) => { x.font = '46px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(t, 32, 36); }); ric.material.map = tex; ric.material.needsUpdate = true; }
+        if (t) { ric.material.map = roomIcon(t); ric.material.needsUpdate = true; }
       }
     },
   };
@@ -146,11 +165,11 @@ function makeLift(tint) {
 // ---------- свет и частицы ----------
 function lamp(x, color = 0xffe2a8, k = 1, fixture = 'tube') {
   const g = new THREE.Group(); g.position.set(x, CEIL, ZW + 26);
-  const pl = new THREE.PointLight(color, 15000 * k, 420, 2); pl.position.set(0, -20, 20); g.add(pl);
+  const pl = new THREE.PointLight(color, 12500 * k, 420, 2); pl.castShadow = false; pl.position.set(0, -20, 20); g.add(pl);
   if (fixture === 'tube') { g.add(bx(46, 5, 12, metal('#30343c', { roughness: .5 }), 0, -2, 0), bx(40, 3, 8, emis('#fff1c8', 3), 0, -5.5, 0)); g.add(halo('#ffe9b0', 70, 0, -8, 10)); }
   else if (fixture === 'bulb') { g.add(cy(.8, .8, 20, metal('#222'), 0, 10, 0), mesh(new THREE.SphereGeometry(6, 16, 12), emis('#ffe9b0', 3), 0, -6, 0, { cast: false }), halo('#ffe9b0', 60, 0, -6, 4)); }
   else if (fixture === 'panel') { g.add(bx(60, 3, 30, emis('#e8f2ff', 2.2), 0, -2, 0, { cast: false }), halo('#dcecff', 80, 0, -6, 12, .5)); }
-  return { g, pl, base: 15000 * k };
+  return { g, pl, base: 12500 * k };
 }
 function motes(n, x0, x1, y0, y1, z0, z1) {
   const pos = new Float32Array(n * 3), ph = [];
@@ -160,12 +179,78 @@ function motes(n, x0, x1, y0, y1, z0, z1) {
   return p;
 }
 
+// засохшее растение в горшке (опрокинутое — если tipped)
+function deadPlant(x, z, tipped) {
+  const g = new THREE.Group(); g.position.set(x, 0, z);
+  const pot = cy(7.5, 5.6, 13, std('#6a4a32', { roughness: .85 }), 0, 6.5, 0); g.add(pot);
+  g.add(cy(7, 7, 1, std('#2a1e14', { roughness: 1 }), 0, 12.6, 0, { cast: false }));
+  const stem = std('#4a3f26', { roughness: .9 }), leaf = std('#5a5028', { roughness: .85, side: THREE.DoubleSide });
+  for (let i = 0; i < 7; i++) {
+    const a = i / 7 * 6.28 + rand(), h = 14 + rand() * 16, bend = .4 + rand() * .9;
+    const s = new THREE.Group(); s.position.set(Math.cos(a) * 2, 13, Math.sin(a) * 2); s.rotation.set(Math.sin(a) * bend, 0, -Math.cos(a) * bend); g.add(s);
+    s.add(cy(.45, .7, h, stem, 0, h / 2, 0));
+    const l = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 8), leaf); l.position.set(1.4, h - 2, 0); l.rotation.set(.6, a, 1.6 + rand()); s.add(l);
+  }
+  if (tipped) { g.rotation.z = PI / 2 - .2; g.position.y = 7; g.add(mesh(new THREE.CircleGeometry(9, 16), std('#22180f', { roughness: 1 }), 0, 16, 0)); }
+  return g;
+}
+
+// бетон перекрытия в разрезе: штриховка, щебень, арматура
+let SLABM = null, NBM = null;
+function slabMat() {
+  if (SLABM) return SLABM;
+  const t = paint(512, 64, (c, w, h) => {
+    c.fillStyle = '#4a4b4e'; c.fillRect(0, 0, w, h);
+    for (let i = 0; i < 260; i++) { c.fillStyle = `rgba(${rand() < .5 ? '20,20,22' : '120,118,112'},${.25 + rand() * .35})`; c.beginPath(); c.arc(rand() * w, rand() * h, .8 + rand() * 2.4, 0, 7); c.fill(); }
+    c.strokeStyle = 'rgba(10,10,12,.55)'; c.lineWidth = 1.4; c.beginPath(); for (let x = -h; x < w; x += 9) { c.moveTo(x, h); c.lineTo(x + h, 0); } c.stroke();
+    c.fillStyle = '#17181a'; for (let x = 16; x < w; x += 32) { c.beginPath(); c.arc(x, h * .7, 3.2, 0, 7); c.fill(); }
+    c.fillStyle = '#0b0b0d'; c.fillRect(0, 0, w, 4); c.fillRect(0, h - 4, w, 4);
+  });
+  t.wrapS = THREE.RepeatWrapping; t.repeat.set(1300 / 120, 1);
+  return SLABM = new THREE.MeshStandardMaterial({ map: t, roughness: .95 });
+}
+// соседние этажи в разрезе: тёмный коридор с проёмами дверей, щель света под одной из них
+function neighbourMat(up) {
+  if (NBM && NBM[up]) return NBM[up];
+  NBM = NBM || {};
+  const W = 1024, Hh = 268, u = W / 1300;                    // 1300×340 единиц
+  const X = x => (x + 470) * u, Y = y => Hh - y * Hh / 340;   // мировые x/y этажа (y от пола) -> пиксели
+  const t = paint(W, Hh, (c) => {
+    const g = c.createLinearGradient(0, 0, 0, Hh); g.addColorStop(0, up ? '#060607' : '#16171a'); g.addColorStop(1, up ? '#17181b' : '#060607'); c.fillStyle = g; c.fillRect(0, 0, W, Hh);
+    c.strokeStyle = 'rgba(255,255,255,.035)'; c.lineWidth = 1; for (let y = 6; y < Hh; y += 9) { c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke(); }
+    if (up) {
+      c.fillStyle = '#0b0b0c'; c.fillRect(0, Y(14), W, Y(0) - Y(14));
+      [-130, 50, 140, 230, 500].forEach((x, i) => {
+        c.fillStyle = '#040405'; c.fillRect(X(x - 37), Y(164), 74 * u, Y(0) - Y(164));
+        c.fillStyle = i === 2 ? '#1c1a17' : '#121214'; c.fillRect(X(x - 32), Y(156), 64 * u, Y(0) - Y(156));
+        if (i === 1) { c.fillStyle = 'rgba(255,190,110,.55)'; c.fillRect(X(x - 30), Y(2), 60 * u, 2.5); const lg = c.createLinearGradient(0, Y(0), 0, Y(0) - 20); lg.addColorStop(0, 'rgba(255,190,110,.18)'); lg.addColorStop(1, 'rgba(255,190,110,0)'); c.fillStyle = lg; c.fillRect(X(x - 50), Y(0) - 20, 100 * u, 20); }
+      });
+      c.fillStyle = '#08080a'; c.fillRect(X(318 - 40), Y(184), 80 * u, Y(0) - Y(184));
+      c.fillStyle = '#9a1a12'; c.beginPath(); c.arc(X(318), Y(196), 2.6, 0, 7); c.fill(); c.fillStyle = 'rgba(200,30,20,.18)'; c.beginPath(); c.arc(X(318), Y(196), 12, 0, 7); c.fill();
+    } else {
+      c.fillStyle = '#0a0a0b'; c.fillRect(0, 0, W, 10);
+      [95, 275].forEach(x => { c.fillStyle = '#121316'; c.fillRect(X(x - 23), 10, 46 * u, 5); });
+      [50, 140, 230].forEach(x => { c.fillStyle = '#040405'; c.fillRect(X(x - 37), Hh - 60, 74 * u, 60); });
+    }
+  });
+  return NBM[up] = new THREE.MeshBasicMaterial({ map: t });
+}
+
 // ---------- оболочка коридора ----------
 function shell(o) {
   const g = new THREE.Group(), R = o.rep || 64;
   const wall = plane(1300, o.wallH || CEIL, o.wallMat(1300 / R, (o.wallH || CEIL) / R), 180, (o.wallH || CEIL) / 2 + (o.wallY || 0), ZW); g.add(wall);
-  const ceil = plane(1300, 700, o.ceilMat, 180, CEIL, 340, [PI / 2, 0, 0]); g.add(ceil);
-  const floor = plane(1300, 700, o.floorMat, 180, 0, 340, [-PI / 2, 0, 0]); g.add(floor);
+  // пол и потолок обрезаны плоскостью разреза: этаж виден как в разрезе здания
+  const depth = ZCUT - ZW + 1;
+  const cutPlane = (mat, y, rx) => {
+    const geo = new THREE.PlaneGeometry(1300, depth), uv = geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setY(i, uv.getY(i) * depth / 700);
+    const m = new THREE.Mesh(geo, mat); m.rotation.x = rx; m.position.set(180, y, ZW - .5 + depth / 2); m.receiveShadow = true; return m;
+  };
+  g.add(cutPlane(o.ceilMat, CEIL, PI / 2), cutPlane(o.floorMat, 0, -PI / 2));
+  // перекрытия в разрезе и тёмные соседние этажи
+  const sm = slabMat();
+  g.add(mesh(new THREE.BoxGeometry(1300, SLAB - .2, 6), sm, 180, -SLAB / 2 - .1, ZCUT - 2, { cast: false }), mesh(new THREE.BoxGeometry(1300, SLAB - .2, 6), sm, 180, CEIL + SLAB / 2 + .1, ZCUT - 2, { cast: false }));
+  [[CEIL + SLAB + 170, 1], [-SLAB - 170, 0]].forEach(([y, up]) => { const p = new THREE.Mesh(new THREE.PlaneGeometry(1300, 340), neighbourMat(up)); p.position.set(180, y, ZW - 2); g.add(p); });
   g.add(bx(1300, 15, 3.2, o.baseMat, 180, 7.5, ZW + 1.6), bx(1300, 6, 4, o.trimMat || o.baseMat, 180, CEIL - 3, ZW + 2));
   return g;
 }
@@ -185,7 +270,7 @@ const ZONES = {
     g.add(cy(5, 5, 160, rust, 190, 200, ZW + 8), cy(8, 8, 6, metal('#3a4448'), 190, 140, ZW + 8));
     const wheel = new THREE.Group(); wheel.position.set(190, 150, ZW + 18); wheel.add(mesh(new THREE.TorusGeometry(11, 1.8, 8, 24), metal('#b8532e', { roughness: .5 }), 0, 0, 0)); for (let k = 0; k < 3; k++) { const s = cy(.9, .9, 22, metal('#b8532e'), 0, 0, 0); s.rotation.z = k * PI / 3; wheel.add(s); } g.add(wheel);
     // пятна воды на полу
-    [[120, 70, 34, 11], [270, 100, 46, 14], [30, 60, 24, 8]].forEach(([x, z, rx, rz]) => { const p = new THREE.Mesh(new THREE.CircleGeometry(1, 28), new THREE.MeshStandardMaterial({ color: 0x0b1a20, roughness: .03, metalness: .1, envMapIntensity: 1.6, transparent: true, opacity: .9 })); p.rotation.x = -PI / 2; p.scale.set(rx, rz, 1); p.position.set(x, .35, z); p.receiveShadow = true; g.add(p); });
+    [[120, 30, 34, 9], [270, 44, 40, 10], [30, 22, 24, 7]].forEach(([x, z, rx, rz]) => { const p = new THREE.Mesh(new THREE.CircleGeometry(1, 28), new THREE.MeshStandardMaterial({ color: 0x0b1a20, roughness: .03, metalness: .1, envMapIntensity: 1.6, transparent: true, opacity: .9 })); p.rotation.x = -PI / 2; p.scale.set(rx, rz, 1); p.position.set(x, .35, z); p.receiveShadow = true; g.add(p); });
     // ржавые подтёки
     [60, 150, 300].forEach(x => { const s = new THREE.Mesh(new THREE.PlaneGeometry(14, 110), new THREE.MeshBasicMaterial({ map: gradientTex([[0, 'rgba(120,60,20,.55)'], [1, 'rgba(120,60,20,0)']]), transparent: true, depthWrite: false })); s.position.set(x, 215, ZW + .3); g.add(s); });
     // бочка и ящик на переднем плане
@@ -200,18 +285,25 @@ const ZONES = {
     const wood = surface({ type: 'planks', color: '#5a3a22', vertical: true, count: 10, rep: [1300 / 90, 1], size: 256, rough: .55, normal: 2.4 });
     g.add(plane(1300, 92, wood, 180, 46, ZW + .2), bx(1300, 6, 5, std('#a07a48', { roughness: .45 }), 180, 92, ZW + 2.4));
     // дорожка, коврики
-    g.add(plane(1300, 74, surface({ type: 'carpet', color: '#7a1e2a', pattern: 'runner', rep: [30, 1], size: 128, rough: 1, normal: 2.5 }), 180, .5, 56, [-PI / 2, 0, 0]));
+    g.add(plane(1300, 74, surface({ type: 'carpet', color: '#7a1e2a', pattern: 'runner', rep: [30, 1], size: 128, rough: 1, normal: 2.5 }), 180, .5, 34, [-PI / 2, 0, 0]));
     DOORS.forEach(x => g.add(bx(52, 1.6, 24, std('#3a2a1c', { roughness: 1 }), x, .8, 14)));
     // картины над дверями и бра
     [[140, 220], [230, 214], [50, 218]].forEach(([x, y], k) => {
       const fr = new THREE.Group(); fr.position.set(x, y, ZW + 2); const gold = metal('#c9a24a', { roughness: .35 });
       fr.add(bx(46, 4, 3, gold, 0, 19, 0), bx(46, 4, 3, gold, 0, -19, 0), bx(4, 42, 3, gold, -21, 0, 0), bx(4, 42, 3, gold, 21, 0, 0));
-      const art = paint(128, 96, (c, w, h) => { const gr = c.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, k % 2 ? '#e9c88a' : '#7fa9c9'); gr.addColorStop(1, k % 2 ? '#b46a5a' : '#c6d8c0'); c.fillStyle = gr; c.fillRect(0, 0, w, h); c.fillStyle = k % 2 ? '#6a3a3a' : '#4a6b3a'; c.beginPath(); c.moveTo(0, h); c.lineTo(w * .3, h * .45); c.lineTo(w * .55, h * .72); c.lineTo(w * .8, h * .36); c.lineTo(w, h); c.fill(); c.fillStyle = '#ffe9a8'; c.beginPath(); c.arc(w * .7, h * .25, 11, 0, 7); c.fill(); });
+      const art = paint(128, 96, (c, w, h) => {
+        const gr = c.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, k % 2 ? '#4a3a26' : '#2e3a40'); gr.addColorStop(1, k % 2 ? '#2a1a12' : '#1c1a16'); c.fillStyle = gr; c.fillRect(0, 0, w, h);
+        c.fillStyle = k % 2 ? 'rgba(20,14,8,.8)' : 'rgba(18,24,20,.8)'; c.beginPath(); c.moveTo(0, h); c.lineTo(w * .3, h * .55); c.lineTo(w * .55, h * .72); c.lineTo(w * .8, h * .5); c.lineTo(w, h); c.fill();
+        if (k === 1) { c.fillStyle = 'rgba(200,170,120,.35)'; c.beginPath(); c.ellipse(w * .5, h * .42, 16, 21, 0, 0, 7); c.fill(); }
+        for (let n = 0; n < 40; n++) { c.fillStyle = `rgba(0,0,0,${rand() * .25})`; c.fillRect(rand() * w, rand() * h, 2 + rand() * 12, 2 + rand() * 12); }
+        c.strokeStyle = 'rgba(230,220,200,.5)'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(w * .62, 0); c.lineTo(w * .58, h * .4); c.lineTo(w * .7, h * .7); c.stroke();
+      });
+      fr.rotation.z = (k - 1) * .05 + (k === 2 ? -.09 : 0);
       fr.add(plane(38, 34, new THREE.MeshStandardMaterial({ map: art, roughness: .5 }), 0, 0, 1)); g.add(fr);
     });
     [95, 185, 275].forEach(x => { const s = new THREE.Group(); s.position.set(x, 168, ZW + 3); s.add(bx(8, 14, 4, metal('#c9a24a'), 0, 0, 0), mesh(new THREE.ConeGeometry(7, 12, 14, 1, true), emis('#ffd99a', 1.4), 0, 12, 4, { cast: false }), halo('#ffd99a', 40, 0, 12, 10, .6)); g.add(s); });
     // растение
-    g.add(cy(8, 6, 14, std('#7a4a2a'), -2, 7, 24), mesh(new THREE.SphereGeometry(13, 14, 10), std('#2f6a34', { roughness: .8 }), -2, 26, 24), mesh(new THREE.SphereGeometry(9, 12, 8), std('#3b8040', { roughness: .8 }), 6, 34, 26));
+    g.add(deadPlant(-8, 22));
     const lamps = [lamp(95, 0xffd99a, .9, 'bulb'), lamp(275, 0xffd99a, .9, 'bulb')];
     return { g, lamps, doorStyle: 'wood', liftTint: '#3a2a1c', dust: .8, fog: [0x1a100a, .0012], ambient: .8 };
   },
@@ -226,7 +318,7 @@ const ZONES = {
     g.add(mesh(new THREE.CylinderGeometry(15, 15, 4, 28), std('#e8ecf5', { roughness: .4 }), 185, 215, ZW + 4, { rot: [PI / 2, 0, 0] }));
     const face = paint(128, 128, (c, w, h) => { c.fillStyle = '#10141c'; c.fillRect(0, 0, w, h); c.strokeStyle = '#e8ecf5'; c.lineWidth = 5; c.beginPath(); c.moveTo(64, 64); c.lineTo(64, 24); c.moveTo(64, 64); c.lineTo(92, 78); c.stroke(); });
     const clock = new THREE.Mesh(new THREE.CircleGeometry(13, 28), new THREE.MeshStandardMaterial({ map: face, roughness: .5 })); clock.position.set(185, 215, ZW + 6.2); g.add(clock);
-    g.add(cy(8, 6, 14, std('#8a6a42'), 96, 7, 20), mesh(new THREE.SphereGeometry(13, 14, 10), std('#3f8a4a', { roughness: .8 }), 96, 28, 20), mesh(new THREE.SphereGeometry(9, 12, 8), std('#4aa05a', { roughness: .8 }), 103, 36, 22));
+    g.add(deadPlant(-6, 18, true));
     g.add(cy(10, 10, 46, std('#cfd8e4', { roughness: .4 }), 358, 23, 36), cy(9, 9, 18, std('#8fb4d8', { roughness: .1, transparent: true, opacity: .7 }), 358, 55, 36));
     const lamps = [lamp(95, 0xe8f2ff, 1, 'panel'), lamp(275, 0xe8f2ff, 1, 'panel')];
     return { g, lamps, doorStyle: 'office', liftTint: '#4a5565', dust: .5, fog: [0x10151f, .001], ambient: 1 };
@@ -260,7 +352,7 @@ const ZONES = {
     // колонны
     [95, 185, 273].forEach(x => { const c = new THREE.Group(); c.position.set(x, 0, ZW + 8); c.add(cy(7, 8, 280, std('#d8cfe0', { roughness: .22, metalness: .1 }), 0, 140, 0, {}, 22), bx(22, 8, 22, gold, 0, 4, 0), bx(22, 8, 22, gold, 0, 276, 0), cy(10, 7, 10, gold, 0, 266, 0)); g.add(c); });
     // ковровая дорожка с золотой каймой
-    g.add(plane(1300, 74, surface({ type: 'carpet', color: '#6b1d27', pattern: 'runner', rep: [30, 1], size: 128, rough: 1, normal: 2.5 }), 180, .6, 56, [-PI / 2, 0, 0]));
+    g.add(plane(1300, 74, surface({ type: 'carpet', color: '#6b1d27', pattern: 'runner', rep: [30, 1], size: 128, rough: 1, normal: 2.5 }), 180, .6, 34, [-PI / 2, 0, 0]));
     // картины
     [[140, 222, '#8a4ab0'], [230, 222, '#2a6a8a'], [50, 222, '#b04a4a']].forEach(([x, y, col]) => { const fr = new THREE.Group(); fr.position.set(x, y, ZW + 2); fr.add(bx(50, 5, 3, gold, 0, 23, 0), bx(50, 5, 3, gold, 0, -23, 0), bx(5, 46, 3, gold, -23, 0, 0), bx(5, 46, 3, gold, 23, 0, 0));
       const art = paint(96, 80, (c, w, h) => { const gr = c.createRadialGradient(w * .5, h * .45, 4, w * .5, h * .5, w * .6); gr.addColorStop(0, col); gr.addColorStop(.6, '#2a2030'); gr.addColorStop(1, '#0e0a12'); c.fillStyle = gr; c.fillRect(0, 0, w, h); });
@@ -289,7 +381,7 @@ function base() {
   win.add(bx(74, 6, 6, wood, 0, 48, 0), bx(74, 6, 6, wood, 0, -48, 0), bx(6, 96, 6, wood, -34, 0, 0), bx(6, 96, 6, wood, 34, 0, 0), bx(3, 90, 4, wood, 0, 0, 1), bx(68, 3, 4, wood, 0, 4, 1), plane(66, 90, new THREE.MeshBasicMaterial({ map: sky }), 0, 0, .5)); g.add(win);
   const moon = new THREE.PointLight(0x9fb8ff, 3500, 260, 2); moon.position.set(172, 190, ZW + 40); g.add(moon);
   // ковёр
-  g.add(plane(240, 70, surface({ type: 'carpet', color: '#6b3a2a', rep: [6, 2], size: 128, rough: 1, normal: 2.5 }), 170, .5, 66, [-PI / 2, 0, 0]));
+  g.add(plane(240, 50, surface({ type: 'carpet', color: '#6b3a2a', rep: [6, 2], size: 128, rough: 1, normal: 2.5 }), 170, .5, 34, [-PI / 2, 0, 0]));
   // кровать
   const bed = new THREE.Group(); bed.position.set(62, 0, 6); const w2 = std('#4a3320', { roughness: .6 });
   bed.add(bx(104, 20, 54, w2, 0, 14, 0), bx(10, 66, 54, w2, -48, 33, 0), bx(98, 14, 50, std('#ddd6c8', { roughness: .95 }), 2, 28, 0), bx(76, 8, 52, std('#3f6aa5', { roughness: .9 }), 12, 36, 0), bx(26, 10, 36, std('#f2efe6', { roughness: .95 }), -34, 38, 0), bx(10, 14, 54, w2, 48, 18, 0)); g.add(bed);
@@ -307,13 +399,123 @@ function base() {
   return { g, lamps, doorStyle: 'wood', liftTint: '#3a2a1c', dust: .5, fog: [0x140d08, .0012], ambient: .9, steam, isBase: true };
 }
 
+// ---------- запустение: грязь, кровь, надписи, мусор ----------
+const GRAFFITI = {
+  z0: ['НЕ СПУСКАЙСЯ', 'ВОДА ОТРАВЛЕНА', '↑ ВЫХОД ↑'],
+  z1: ['ОНИ ВНУТРИ', 'КВ. 14 — ЧИСТО', 'МАМА, МЫ НАВЕРХУ'],
+  z2: ['НЕ ОТКРЫВАТЬ', 'ЭВАКУАЦИЯ ОТМЕНЕНА', '3 ДНЯ БЕЗ ВОДЫ'],
+  z3: ['КАРАНТИН', 'ОБРАЗЕЦ СБЕЖАЛ', 'НЕ ДЫШИ'],
+  z4: ['ОНИ ЗНАЛИ', 'ВЕРТОЛЁТА НЕ БУДЕТ', 'КРЫША →'],
+};
+const WX0 = -170, WW = 700;                       // полоса стены/пола, которую покрывает грязь
+const wx = (x, w) => (x - WX0) / WW * w;          // мировой x -> пиксель холста
+function blotch(c, x, y, r, col, a) { const g = c.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, `rgba(${col},${a})`); g.addColorStop(1, `rgba(${col},0)`); c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); }
+function crack(c, x, y, len, ang) {
+  c.beginPath(); c.moveTo(x, y);
+  for (let i = 0; i < len; i++) { ang += (rand() - .5) * .9; x += Math.cos(ang) * 7; y += Math.sin(ang) * 7; c.lineTo(x, y); if (rand() < .12) crack(c, x, y, len * .4 | 0, ang + (rand() - .5) * 2); }
+  c.stroke();
+}
+function handprint(c, x, y, s, a) {
+  c.save(); c.translate(x, y); c.rotate((rand() - .5) * .8); c.fillStyle = `rgba(92,8,6,${a})`;
+  c.beginPath(); c.ellipse(0, 0, 9 * s, 11 * s, 0, 0, 7); c.fill();
+  [[-8, -16, .32], [-3, -20, .1], [3, -20, -.1], [8, -16, -.3], [12, -2, -1]].forEach(([fx, fy, r]) => { c.save(); c.translate(fx * s, fy * s); c.rotate(r); c.beginPath(); c.ellipse(0, 0, 2.4 * s, 7 * s, 0, 0, 7); c.fill(); c.restore(); });
+  for (let i = 0; i < 3; i++) { const dx = (rand() - .5) * 14 * s; c.fillRect(dx, 6 * s, 1.6 * s, (12 + rand() * 30) * s); }
+  c.restore();
+}
+function smear(c, x, y, w, a) {
+  c.save(); c.strokeStyle = `rgba(80,6,4,${a})`; c.lineCap = 'round';
+  for (let k = 0; k < 4; k++) { c.lineWidth = 3 + rand() * 6; c.beginPath(); c.moveTo(x, y + k * 5); c.bezierCurveTo(x + w * .3, y + k * 5 + (rand() - .5) * 20, x + w * .7, y + k * 6 + 10, x + w, y + 20 + k * 4); c.stroke(); }
+  c.fillStyle = `rgba(70,5,3,${a * .9})`; for (let i = 0; i < 6; i++) c.fillRect(x + rand() * w, y + 10, 2, 20 + rand() * 60);
+  c.restore();
+}
+function wallGrime(kind, light) {
+  const W = 2048, H = 1024;
+  return paint(W, H, (c) => {
+    let g = c.createLinearGradient(0, H, 0, H * .5); g.addColorStop(0, 'rgba(14,11,7,.7)'); g.addColorStop(1, 'rgba(14,11,7,0)'); c.fillStyle = g; c.fillRect(0, 0, W, H);
+    g = c.createLinearGradient(0, 0, 0, H * .28); g.addColorStop(0, 'rgba(6,6,6,.75)'); g.addColorStop(1, 'rgba(6,6,6,0)'); c.fillStyle = g; c.fillRect(0, 0, W, H);
+    for (let i = 0; i < 70; i++) blotch(c, rand() * W, rand() * H, 30 + rand() * 160, rand() < .2 ? '40,30,12' : '18,14,8', (light ? .12 : .28) * rand());
+    for (let i = 0; i < 26; i++) { const x = rand() * W, w = 4 + rand() * 18, l = 120 + rand() * 520; g = c.createLinearGradient(0, 0, 0, l); g.addColorStop(0, `rgba(30,22,10,${.25 + rand() * .3})`); g.addColorStop(1, 'rgba(30,22,10,0)'); c.fillStyle = g; c.fillRect(x, 0, w, l); }
+    if (light) return;
+    c.strokeStyle = 'rgba(8,7,6,.75)'; c.lineWidth = 1.6;
+    for (let i = 0; i < 6; i++) crack(c, rand() * W, rand() * H * .8, 10 + rand() * 18, rand() * 6.28);
+    // кровь и надписи: над дверями и в просветах между ними
+    const spots = [wx(95, W), wx(185, W), wx(275, W), wx(-6, W), wx(368, W)];
+    for (let i = 0; i < 3; i++) handprint(c, spots[(rand() * spots.length) | 0] + (rand() - .5) * 20, H * (.45 + rand() * .3), 1.6 + rand() * .5, .7);
+    smear(c, spots[(rand() * 3) | 0] - 60, H * (.5 + rand() * .2), 140 + rand() * 120, .55);
+    const lines = GRAFFITI[kind] || [];
+    lines.slice(0, 2).forEach((t, k) => {
+      c.save(); c.translate(wx(k ? 255 : 95, W), H * (k ? .2 : .26)); c.rotate((rand() - .5) * .12);
+      c.font = `700 ${46 + rand() * 14}px Impact, "Arial Narrow", sans-serif`; c.textAlign = 'center';
+      const red = k === 0 || kind === 'z4';
+      c.fillStyle = red ? 'rgba(120,10,8,.8)' : 'rgba(220,214,196,.62)'; c.fillText(t, 0, 0);
+      c.fillStyle = red ? 'rgba(110,8,6,.7)' : 'rgba(210,204,186,.5)'; for (let i = 0; i < 7; i++) c.fillRect((rand() - .5) * t.length * 22, 6, 2.2, 10 + rand() * 40);
+      c.restore();
+    });
+  });
+}
+function floorGrime(light) {
+  const W = 2048, H = 768;
+  return paint(W, H, (c) => {
+    // контактная тень у стены (v=0 у стены)
+    let g = c.createLinearGradient(0, 0, 0, H * .16); g.addColorStop(0, 'rgba(0,0,0,.85)'); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(0, 0, W, H);
+    for (let i = 0; i < 90; i++) blotch(c, rand() * W, rand() * H, 20 + rand() * 120, '16,12,8', (light ? .14 : .32) * rand());
+    if (light) return;
+    // лужа крови и след волочения
+    const bx0 = wx(150 + rand() * 120, W), by = H * (.25 + rand() * .2);
+    c.fillStyle = 'rgba(58,4,3,.85)'; c.beginPath(); for (let a = 0; a < 6.3; a += .3) { const r = 40 + rand() * 26; c.lineTo(bx0 + Math.cos(a) * r * 1.6, by + Math.sin(a) * r * .9); } c.fill();
+    c.strokeStyle = 'rgba(60,5,3,.5)'; c.lineCap = 'round'; const dir = rand() < .5 ? -1 : 1;
+    for (let k = 0; k < 5; k++) { c.lineWidth = 4 + rand() * 9; c.beginPath(); c.moveTo(bx0, by + (k - 2) * 8); c.bezierCurveTo(bx0 + dir * 200, by + (k - 2) * 10 + 30, bx0 + dir * 420, by - 20, bx0 + dir * (560 + rand() * 120), by + (k - 2) * 6 + 40); c.stroke(); }
+    for (let i = 0; i < 30; i++) blotch(c, bx0 + (rand() - .5) * 300, by + (rand() - .5) * 140, 3 + rand() * 7, '70,5,3', .8);
+    // следы обуви
+    c.fillStyle = 'rgba(12,9,6,.35)'; for (let i = 0; i < 14; i++) { const x = W * .1 + i * 120 + rand() * 30, y = H * .5 + (i % 2) * 22 + rand() * 10; c.beginPath(); c.ellipse(x, y, 13, 6, .1, 0, 7); c.fill(); }
+  });
+}
+function debris(kind) {
+  const g = new THREE.Group();
+  const paperM = [0, 1, 2].map(k => std(['#cfc7b0', '#b9b4a4', '#d8d0bc'][k], { roughness: .95, side: THREE.DoubleSide }));
+  const avoid = x => Math.abs(x - 96) < 22 || Math.abs(x - 270) < 26;   // не загораживать бойцов
+  for (let i = 0; i < 18; i++) {
+    let x = -10 + rand() * 380; if (avoid(x)) x += 50;
+    const p = new THREE.Mesh(new THREE.PlaneGeometry(6 + rand() * 4, 8 + rand() * 4, 2, 2), paperM[i % 3]);
+    const pp = p.geometry.attributes.position; for (let j = 0; j < pp.count; j++) pp.setZ(j, (rand() - .5) * 1.2); p.geometry.computeVertexNormals();
+    p.rotation.set(-PI / 2 + (rand() - .5) * .3, 0, rand() * 6.28); p.position.set(x, .5 + rand() * .3, 2 + rand() * 56); p.receiveShadow = true; g.add(p);
+  }
+  for (let i = 0; i < 7; i++) {   // скомканная бумага и банки
+    let x = -10 + rand() * 380; if (avoid(x)) x += 50;
+    if (rand() < .5) { const b = new THREE.Mesh(new THREE.IcosahedronGeometry(2.4 + rand() * 1.5, 1), paperM[i % 3]); const bp = b.geometry.attributes.position; for (let j = 0; j < bp.count; j++) bp.setXYZ(j, bp.getX(j) * (.75 + rand() * .5), bp.getY(j) * (.75 + rand() * .5), bp.getZ(j) * (.75 + rand() * .5)); b.geometry.computeVertexNormals(); b.position.set(x, 2, 4 + rand() * 54); b.castShadow = true; g.add(b); }
+    else { const cn = cy(1.7, 1.7, 5.4, metal(['#8a2a22', '#3a6a8a', '#9a9a8a'][i % 3], { roughness: .4 }), x, 1.7, 4 + rand() * 54, { rot: [PI / 2, 0, rand() * 6] }); cn.rotation.y = rand() * 6; g.add(cn); }
+  }
+  // мешки с мусором у стены по краям
+  const bagM = std('#0d0f12', { roughness: .32, metalness: .1 });
+  [[-6, 8], [372, 10]].forEach(([x, z], k) => {
+    const b = new THREE.Mesh(new THREE.SphereGeometry(12, 20, 14), bagM), bp = b.geometry.attributes.position;
+    for (let j = 0; j < bp.count; j++) { const y = bp.getY(j); bp.setXYZ(j, bp.getX(j) * (1 + (rand() - .5) * .12), y < 0 ? y * .55 : y * (.9 + rand() * .15), bp.getZ(j) * (1 + (rand() - .5) * .12)); }
+    b.geometry.computeVertexNormals(); b.position.set(x, 7, z); b.castShadow = b.receiveShadow = true; g.add(b);
+    g.add(cy(1.6, 3.2, 5, bagM, x + 2, 15.5, z));
+  });
+  // осколки стекла
+  const glassM = std('#cfe2ea', { roughness: .05, metalness: .6 });
+  for (let i = 0; i < 12; i++) { const s = new THREE.Mesh(new THREE.CircleGeometry(1 + rand() * 1.4, 3), glassM); s.rotation.set(-PI / 2, 0, rand() * 6); s.position.set(150 + rand() * 80, .7, 14 + rand() * 44); g.add(s); }
+  return g;
+}
+function decay(kind) {
+  const light = kind === 'base', g = new THREE.Group();
+  const wallM = new THREE.MeshStandardMaterial({ map: wallGrime(kind, light), transparent: true, roughness: .9, depthWrite: false });
+  const wall = new THREE.Mesh(new THREE.PlaneGeometry(WW, CEIL), wallM); wall.position.set(WX0 + WW / 2, CEIL / 2, ZW + .45); wall.receiveShadow = true; wall.renderOrder = 1; g.add(wall);
+  const floorM = new THREE.MeshStandardMaterial({ map: floorGrime(light), transparent: true, roughness: .85, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(WW, ZCUT - ZW), floorM); floor.rotation.x = -PI / 2; floor.position.set(WX0 + WW / 2, .3, (ZCUT + ZW) / 2); floor.receiveShadow = true; floor.renderOrder = 1; g.add(floor);
+  if (!light) g.add(debris(kind));
+  return g;
+}
+
 export function buildEnv(kind) {
   const spec = kind === 'base' ? base() : ZONES[kind]();
   const root = new THREE.Group(); root.position.y = FY; root.add(spec.g);
+  setSeed(kind.charCodeAt(kind.length - 1) * 7 + 3); root.add(decay(kind));
   const doors = DOORS.map((_, i) => { const d = makeDoor(i, spec.doorStyle); root.add(d.group); return d; });
   const lift = makeLift(spec.liftTint); root.add(lift.group);
   spec.lamps.forEach(l => root.add(l.g));
-  spec.lamps.forEach(l => root.add(lightCone(l.g.position.x, CEIL - 6, 4, 62, kind === 'z3' || kind === 'z2' ? '#cfe6ff' : '#ffe2a8', .12)));
+  spec.lamps.forEach(l => root.add(lightCone(l.g.position.x, CEIL - 6, 4, 62, kind === 'z3' || kind === 'z2' ? '#cfe6ff' : '#ffe2a8', .075)));
   const dust = motes(Math.round(90 * (spec.dust || .6)), -20, 380, 20, 280, 0, 60); root.add(dust);
   let time = 0;
   return {
