@@ -1359,13 +1359,22 @@ function render() {
     case 'craft': {
       head(a, `Верстак ур.${S.bench}. Материалы: 🔩${S.scrap} 🧵${S.cloth} 🧪${S.chem}`);
       const nw = WEAPONS[S.wi + 1], na = ARMORS[S.ai + 1];
+      // следующее оружие и броня — карточки с рисунком, как в списке крафта Skyhill
+      const card = (kind, title, sub, cost, fn, dis, lockTxt) => {
+        const b = document.createElement('button'); b.className = 'craft-card' + (lockTxt ? ' locked' : '');
+        b.innerHTML = `<canvas width="${kind === 'w' ? 200 : 120}" height="${kind === 'w' ? 100 : 180}"></canvas><div><b>${title}</b><small>${sub}</small><i>${lockTxt || cost}</i></div>`;
+        b.disabled = dis; b.onclick = () => { sfx('click'); fn(); };
+        a.appendChild(b); return b.querySelector('canvas');
+      };
       if (nw) {
         const need = WEAPON_BENCH[S.wi + 1], lock = S.bench < need;
-        a.appendChild(btn(lock ? `🔒 ${nw.n}: нужен верстак ур.${need} (улучшается в убежище)` : `⚔️ ${nw.n} (+${nw.d}, навык «${SK[WEAPON_SKILL[S.wi + 1]]}») — ${costText(nw.c)}`, () => craft('weapon', S.wi + 1), 'full', lock || !canPay(nw.c)));
+        const cv = card('w', nw.n, `урон +${nw.d} · навык «${SK[WEAPON_SKILL[S.wi + 1]]}»`, costText(nw.c), () => craft('weapon', S.wi + 1), lock || !canPay(nw.c), lock ? `нужен верстак ур.${need}` : '');
+        if (window.GL3D && GL3D.drawWeapon) GL3D.drawWeapon(cv, S.wi + 1);
       }
       if (na) {
         const need = ARMOR_BENCH[S.ai + 1], lock = S.bench < need;
-        a.appendChild(btn(lock ? `🔒 ${na.n}: нужен верстак ур.${need} (улучшается в убежище)` : `🛡️ ${na.n} (защита ${na.a}) — ${costText(na.c)}`, () => craft('armor', S.ai + 1), 'full', lock || !canPay(na.c)));
+        const cv = card('a', na.n, `защита ${na.a}`, costText(na.c), () => craft('armor', S.ai + 1), lock || !canPay(na.c), lock ? `нужен верстак ур.${need}` : '');
+        if (window.GL3D && GL3D.drawChar) GL3D.drawChar(cv, { hero: true, wi: 0, ai: S.ai + 1 }, 'full');
       }
       Object.entries(RECIPES).forEach(([k, r]) => a.appendChild(btn(`${RES_ICON[k]} ${r.n} — ${costText(r.c)}`, () => craft('res', k), 'full', !canPay(r.c))));
       if (S.inBase && BENCH_UP[S.bench + 1]) a.appendChild(btn(`🔧 Улучшить верстак до ур.${S.bench + 1} — ${costText(BENCH_UP[S.bench + 1])}`, () => upgrade('bench'), 'full primary', !canPay(BENCH_UP[S.bench + 1])));
