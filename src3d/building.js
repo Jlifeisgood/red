@@ -130,7 +130,7 @@ export function buildBuilding(o, L) {
     const p = plane(W, H, mat, (cp.x0 + cp.x1) / 2, yc(FY - H / 2), -10);
     const dark = cp.k === 'room' && !o.base ? plane(W, H, new THREE.MeshBasicMaterial({ color: 0x030304, transparent: true, opacity: .96, depthWrite: false }), (cp.x0 + cp.x1) / 2, yc(FY - H / 2), -6) : null;
     if (dark) dark.renderOrder = 5;
-    rooms.push({ cp, mat, tex, dark, glow: 0, open: 0 });
+    rooms.push({ cp, mat, tex, dark, glow: 0, open: 0, flick: !o.base && ((o.floor * 7 + ci * 13) % 5 === 0) });
   });
   // перегородки между отсеками
   for (let i = 1; i < L.comps.length; i++) { const x = (L.comps[i - 1].x1 + L.comps[i].x0) / 2, w = L.comps[i].x0 - L.comps[i - 1].x1 + 2; plane(w, H, new THREE.MeshBasicMaterial({ color: 0x101112 }), x, yc(FY - H / 2), -8); }
@@ -190,6 +190,12 @@ export function buildBuilding(o, L) {
   // свет в текущей комнате (мягкое пятно у лампы)
   const glowT = canvas(64, 64, c => { const g = c.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(255,236,200,.55)'); g.addColorStop(1, 'rgba(255,236,200,0)'); c.fillStyle = g; c.fillRect(0, 0, 64, 64); });
   const glow = plane(200, 200, new THREE.MeshBasicMaterial({ map: glowT, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0 }), 0, 0, -7); glow.renderOrder = 6;
+  // пыль в луче света комнаты, где стоит герой
+  const DN = 60, dpos = new Float32Array(DN * 3), dv = [];
+  for (let i = 0; i < DN; i++) dv.push([Math.random(), Math.random(), Math.random() * 6.28, .3 + Math.random() * .7]);
+  const dust = new THREE.Points(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(dpos, 3)),
+    new THREE.PointsMaterial({ color: 0xffe8c0, size: 1.6, sizeAttenuation: false, transparent: true, opacity: .45, depthWrite: false, blending: THREE.AdditiveBlending }));
+  dust.frustumCulled = false; dust.renderOrder = 7; root.add(dust);
   let liftOpen = 0, time = 0;
   return {
     root,
@@ -202,9 +208,16 @@ export function buildBuilding(o, L) {
         r.open += ((lit ? 1 : 0) - r.open) * Math.min(1, dt * 3);
         if (r.dark) { r.dark.material.opacity = .96 * (1 - r.open); r.dark.visible = r.dark.material.opacity > .01; }
         const b = here ? 1 : .72; r.glow += (b - r.glow) * Math.min(1, dt * 3);
-        r.mat.color.setScalar(r.glow);
+        // в некоторых комнатах лампа моргает: короткие провалы света
+        let fl = 1; if (r.flick) { const q = Math.sin(time * 2.3 + i) * Math.sin(time * 7.1 + i * 3); fl = q > .82 ? .35 : q > .76 ? .7 : 1; }
+        r.mat.color.setScalar(r.glow * fl);
       });
       const hc = rooms[s.heroComp]; if (hc) { glow.position.set((hc.cp.x0 + hc.cp.x1) / 2, yc(FY - H + 40), -7); glow.material.opacity = .5 * hc.open; }
+      if (hc) {
+        const cx = (hc.cp.x0 + hc.cp.x1) / 2, P = dust.geometry.attributes.position;
+        for (let i = 0; i < DN; i++) { const v = dv[i]; v[1] = (v[1] + dt * .02 * v[3]) % 1; v[2] += dt * v[3]; const yy = FY - H + 20 + v[1] * (H - 30), spread = 10 + v[1] * 70; P.setXYZ(i, cx + (v[0] - .5) * 2 * spread + Math.sin(v[2]) * 3, yc(yy), -6.5); }
+        P.needsUpdate = true; dust.material.opacity = .4 * hc.open * hc.mat.color.r;
+      }
       // лифт
       const ok = !!s.liftOk;
       liftOpen += ((s.liftOpen ? 1 : 0) - liftOpen) * Math.min(1, dt * 6);

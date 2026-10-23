@@ -182,6 +182,7 @@ function floatText(text, cls, where) {
   const y = (where === 'sc-enemy' ? FOE_Y : HERO_Y) - 150;
   t.setAttribute('x', x); t.setAttribute('y', y); t.setAttribute('class', 'ft ' + cls); t.setAttribute('text-anchor', 'middle');
   t.textContent = text; $('fl').appendChild(t);
+  if (cls === 'crit' && window.GL3D) GL3D.trigger('foe', 'shake');
   setTimeout(() => t.remove(), 950);
 }
 

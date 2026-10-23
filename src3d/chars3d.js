@@ -91,7 +91,7 @@ function enemyModel(name) {
 
 // ---------- сцена ----------
 let renderer, scene, camera, canvas, hostEl, post = null;
-let bld = null, bldKey = '', hurt = 0, lastState = null, slide = null;
+let bld = null, bldKey = '', hurt = 0, lastState = null, slide = null, shakeT = 0, stopT = 0;
 let hero = null, foe = null, npc = null, dying = [], heroKey = '', foeKey = '', npcKey = '', view = '', lastDraw = 0;
 GL.quality = 'high';
 try { GL.quality = localStorage.getItem('tower-q') || 'high'; } catch (e) {}
@@ -115,7 +115,7 @@ function disposeHolder(h) {
 }
 const animate = (h, dt) => h.model.apply(h.ctl.pose(dt));
 
-function setupView() {
+function setupView(dt = .016) {
   const r = hostEl.getBoundingClientRect(), W = Math.max(1, r.width), H = Math.max(1, r.height);
   const key = W + 'x' + H;
   if (key !== view) {
@@ -126,7 +126,9 @@ function setupView() {
   }
   // окно мира задаёт камера сцены (scene.js): SVG-слои и WebGL видят одно и то же
   const V = window.VIEW || { x: 0, y: 0, w: 900, h: 400 };
-  camera.left = V.x; camera.right = V.x + V.w; camera.top = -V.y; camera.bottom = -(V.y + V.h); camera.updateProjectionMatrix();
+  shakeT = Math.max(0, shakeT - dt);
+  const sk = shakeT > 0 ? shakeT * 22 : 0, sx = (Math.random() - .5) * sk, sy = (Math.random() - .5) * sk;
+  camera.left = V.x + sx; camera.right = V.x + V.w + sx; camera.top = -V.y + sy; camera.bottom = -(V.y + V.h) + sy; camera.updateProjectionMatrix();
 }
 function trackHero() {
   const el = document.getElementById('hero'); if (!el || !hero) return;
@@ -144,8 +146,9 @@ function frame(ts) {
   if (!GL.active || !renderer) return;
   const t = ts / 1000;
   if (t - lastDraw < .024) return;                 // до ~40 к/с ради батареи
-  const dt = Math.min(.05, lastDraw ? t - lastDraw : .016); lastDraw = t;
-  setupView();
+  const rdt = Math.min(.05, lastDraw ? t - lastDraw : .016); lastDraw = t;
+  stopT = Math.max(0, stopT - rdt); const dt = stopT > 0 ? rdt * .08 : rdt;      // стоп-кадр в момент удара
+  setupView(rdt);
   if (hero) {
     trackHero(); const s = hero.st;
     if (s.atk >= 0) { s.atk += dt / .55; if (s.atk >= 1) s.atk = -1; }
@@ -155,18 +158,18 @@ function frame(ts) {
   }
   for (const h of [foe, npc]) {
     if (!h) continue;
-    const s = h.st; s.pop = Math.min(1, s.pop + dt * 4);
+    const s = h.st; s.pop = Math.min(1, s.pop + dt / (h === foe ? 1.1 : .01));
     if (s.atk >= 0) { s.atk += dt / .6; if (s.atk >= 1) s.atk = -1; }
-    if (s.flash > 0) s.flash = Math.max(0, s.flash - dt * 3); setTint(h, s.flash, 1);
+    if (s.flash > 0) s.flash = Math.max(0, s.flash - dt * 3);
+    // враг выходит из темноты в глубине комнаты: шаг вперёд и проявление из тени
+    const e = 1 - Math.pow(1 - s.pop, 3);
+    setTint(h, s.flash, .08 + .92 * e);
+    if (h === foe) { h.ctl.loop(s.pop < 1 ? 'walk' : 'idle'); h.root.position.x = (h.baseX || 0) - h.st.dir * 60 * (1 - e); }
     h.yaw.position.x = h.syaw.position.x = s.atk >= 0 ? Math.sin(Math.PI * s.atk) * 34 : 0;
-    const k = 1 - Math.pow(1 - s.pop, 3); h.root.scale.set(k, k, k);
     animate(h, dt);
   }
-  dying = dying.filter(d => {
-    animate(d, dt); d.left -= dt;
-    if (d.left < .4) d.root.traverse(o => { if (o.material) [].concat(o.material).forEach(m => { m.transparent = true; m.opacity = Math.max(0, d.left / .4) * (m.userData.op0 == null ? (m.userData.op0 = m.opacity) : m.userData.op0); }); });
-    if (d.left <= 0) { disposeHolder(d); return false; } return true;
-  });
+  // тела остаются лежать до смены этажа
+  dying.forEach(d => animate(d, dt));
   if (bld && lastState) bld.update(dt, lastState);
   if (slide && bld) { const t = Math.min(1, (performance.now() - slide.t0) / slide.dur), e = t < .5 ? 4 * t ** 3 : 1 - Math.pow(-2 * t + 2, 3) / 2; bld.root.position.y = slide.from * (1 - e); if (t >= 1) slide = null; }   // по часам, а не по кадрам: синхронно с выходом героя
   updateBlood(dt);
@@ -184,7 +187,7 @@ GL.update = (o) => {
     if (bld) { scene.remove(bld.root); bld.dispose(); bld = null; }
     try { bld = buildBuilding({ zone: o.zone, floor: o.floor, base: o.base, rooms: o.rooms }, o.layout); scene.add(bld.root); } catch (e) { console.error(e); bld = null; }
     // поездка на лифте: новый этаж въезжает сверху (подъём) или снизу (спуск в убежище), будто камера едет вместе с кабиной
-    blood.length = 0;
+    blood.length = 0; dying.forEach(disposeHolder); dying = [];
     if (bld && o.slide) { const d = o.layout.roomH + o.layout.slab; slide = { t0: performance.now(), dur: 1050, from: o.slide === 'up' ? d : -d }; bld.root.position.y = slide.from; } else slide = null;
   }
   hostEl.classList.toggle('env', !!bld);
@@ -194,11 +197,11 @@ GL.update = (o) => {
   const fk = o.enemy || '';
   if (fk !== foeKey) {
     foeKey = fk;
-    if (foe) { if (foe.dyingStarted) { foe.left = 1.5; dying.push(foe); } else disposeHolder(foe); }
+    if (foe) { if (foe.dyingStarted) { foe.left = 2; dying.push(foe); while (dying.length > 3) disposeHolder(dying.shift()); } else disposeHolder(foe); }
     foe = null;
-    if (fk) { foe = holder(enemyModel(fk)); foe.root.scale.set(0, 0, 0); scene.add(foe.root); }
+    if (fk) { foe = holder(enemyModel(fk)); scene.add(foe.root); }
   }
-  if (foe) { foe.root.position.set(o.foeX, -o.foeY, 0); face(foe, o.foeDir || -1); }
+  if (foe) { foe.baseX = o.foeX; if (foe.st.pop >= 1) foe.root.position.x = o.foeX; foe.root.position.y = -o.foeY; face(foe, o.foeDir || -1); }
   // мирный житель/торговец в комнате
   const nk = o.npc || '';
   if (nk !== npcKey) { npcKey = nk; disposeHolder(npc); npc = null; if (nk) { npc = holder(npcModel(nk)); npc.st.pop = 1; scene.add(npc.root); } }
@@ -217,9 +220,10 @@ GL.setQuality = (q) => {
 };
 GL.trigger = (who, kind) => {
   if (!GL.ready || !GL.enabled) return;
+  if (kind === 'shake') { shakeT = Math.max(shakeT, .32); stopT = .12; return; }
   const h = who === 'hero' ? hero : foe; if (!h) return;
   if (kind === 'attack') { h.st.atk = 0; h.ctl.once('attack'); }
-  else if (kind === 'hurt') { h.st.flash = 1; h.ctl.once('hit'); if (who === 'hero') hurt = 1; sprayBlood(h.root.position.x, h.root.position.y + 82 * (h.model.kind === 'quad' ? .5 : 1), -h.st.dir, 8 + (Math.random() * 7 | 0)); }
+  else if (kind === 'hurt') { stopT = .07; h.st.flash = 1; h.ctl.once('hit'); if (who === 'hero') hurt = 1; sprayBlood(h.root.position.x, h.root.position.y + 82 * (h.model.kind === 'quad' ? .5 : 1), -h.st.dir, 8 + (Math.random() * 7 | 0)); }
   else if (kind === 'death') { h.dyingStarted = true; h.ctl.once('death'); if (bld) { const x = h.root.position.x; setTimeout(() => bld && bld.stamp(x + h.st.dir * 20, 0, 16, 'pool'), 700); } }
   else if (kind === 'search') h.ctl.once('search');
 };
