@@ -324,14 +324,14 @@ const ZONES = {
     return { g, lamps, doorStyle: 'office', liftTint: '#4a5565', dust: .5, fog: [0x10151f, .001], ambient: 1 };
   },
   z3() {
-    const g = shell({ rep: 64, wallMat: wallMatOf({ type: 'tiles', color: '#cfe6e0', grout: '#6b8a84', n: 4, size: 256, rough: .3, normal: 1.8, grime: '#0e1c1a' }), ceilMat: surface({ type: 'concrete', color: '#2a3836', rep: [10, 5], size: 128, rough: .9 }),
+    const g = shell({ rep: 64, wallMat: wallMatOf({ type: 'tiles', color: '#9fb6b0', grout: '#4f6a64', n: 4, size: 256, rough: .3, normal: 1.8, grime: '#0e1c1a' }), ceilMat: surface({ type: 'concrete', color: '#2a3836', rep: [10, 5], size: 128, rough: .9 }),
       floorMat: surface({ type: 'concrete', color: '#2c3a38', rep: [10, 6], size: 256, rough: .16, normal: 1.2, n: 4, cracks: 2 }), baseMat: std('#d9ad1f', { roughness: .5 }), trimMat: std('#1c2a28', { roughness: .6 }) });
     const haz = paint(64, 64, (c, w, h) => { for (let i = -8; i < 12; i++) { c.fillStyle = i % 2 ? '#15171c' : '#d9ad1f'; c.beginPath(); c.moveTo(i * 16, 0); c.lineTo(i * 16 + 16, 0); c.lineTo(i * 16 + 16 + 64, h); c.lineTo(i * 16 + 64, h); c.fill(); } });
     haz.wrapS = haz.wrapT = THREE.RepeatWrapping; haz.repeat.set(1300 / 20, 1); g.add(plane(1300, 15, new THREE.MeshStandardMaterial({ map: haz, roughness: .6 }), 180, 7.5, ZW + 3.3));
     // колбы со светящейся жидкостью и пузырями
     const tubes = [95, 185].map(x => {
       const t = new THREE.Group(); t.position.set(x, 0, ZW + 8);
-      t.add(cy(8, 8, 190, new THREE.MeshStandardMaterial({ color: 0xbdfff0, roughness: .04, metalness: .1, transparent: true, opacity: .16, envMapIntensity: 1.8 }), 0, 110, 0, { cast: false }), cy(6.4, 6.4, 120, emis('#58ffb0', 1.8), 0, 78, 0, { cast: false }), cy(9.4, 9.4, 8, metal('#34413f'), 0, 14, 0), cy(9.4, 9.4, 8, metal('#34413f'), 0, 206, 0), halo('#58ffb0', 70, 0, 120, 12, .55));
+      t.add(cy(8, 8, 190, new THREE.MeshStandardMaterial({ color: 0xbdfff0, roughness: .04, metalness: .1, transparent: true, opacity: .16, envMapIntensity: 1.8 }), 0, 110, 0, { cast: false }), cy(6.4, 6.4, 120, emis('#58ffb0', 1.1), 0, 78, 0, { cast: false }), cy(9.4, 9.4, 8, metal('#34413f'), 0, 14, 0), cy(9.4, 9.4, 8, metal('#34413f'), 0, 206, 0), halo('#58ffb0', 70, 0, 120, 12, .55));
       const bp = new Float32Array(10 * 3), bs = []; for (let i = 0; i < 10; i++) { bs.push([rand() * 6.28, rand() * 90]); }
       const bub = new THREE.Points(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(bp, 3)), new THREE.PointsMaterial({ color: 0xcfffee, size: 3, transparent: true, opacity: .8, depthWrite: false })); bub.frustumCulled = false; bub.userData.bs = bs; t.add(bub); g.add(t); return bub;
     });
@@ -341,7 +341,7 @@ const ZONES = {
     const mon = paint(128, 64, (c, w, h) => { c.fillStyle = '#04100c'; c.fillRect(0, 0, w, h); c.strokeStyle = '#58ffb0'; c.lineWidth = 2.5; c.beginPath(); c.moveTo(4, 36); for (let x = 4; x < 124; x += 6) c.lineTo(x, 36 + (x % 24 === 4 ? -22 : x % 24 === 10 ? 16 : Math.sin(x) * 2)); c.stroke(); });
     [[230, 214], [50, 214]].forEach(([x, y]) => g.add(bx(50, 30, 3, std('#10151a', { roughness: .4 }), x, y, ZW + 2), plane(46, 24, new THREE.MeshBasicMaterial({ map: mon }), x, y, ZW + 3.6)));
     g.add(bx(1300, 3, 8, emis('#58ffb0', 1.2), 180, .6, ZW + 40, { cast: false }));
-    const lamps = [lamp(95, 0xcfffee, 1, 'panel'), lamp(275, 0xcfffee, 1, 'panel')];
+    const lamps = [lamp(95, 0xcfffee, .7, 'panel'), lamp(275, 0xcfffee, .7, 'panel')];
     return { g, lamps, tubes, doorStyle: 'lab', liftTint: '#4a5a5e', dust: .35, fog: [0x0a1614, .0012], ambient: 1.05 };
   },
   z4() {
@@ -350,7 +350,7 @@ const ZONES = {
     const gold = metal('#e6b422', { roughness: .28 });
     g.add(bx(1300, 4, 3, gold, 180, 175, ZW + 1.5), plane(1300, 10, std('#1c1422', { roughness: .8 }), 180, 245, ZW + .2));
     // колонны
-    [95, 185, 273].forEach(x => { const c = new THREE.Group(); c.position.set(x, 0, ZW + 8); c.add(cy(7, 8, 280, std('#d8cfe0', { roughness: .22, metalness: .1 }), 0, 140, 0, {}, 22), bx(22, 8, 22, gold, 0, 4, 0), bx(22, 8, 22, gold, 0, 276, 0), cy(10, 7, 10, gold, 0, 266, 0)); g.add(c); });
+    [95, 185, 273].forEach(x => { const c = new THREE.Group(); c.position.set(x, 0, ZW + 8); c.add(cy(7, 8, 280, std('#9a92a4', { roughness: .4, metalness: .1 }), 0, 140, 0, {}, 22), bx(22, 8, 22, gold, 0, 4, 0), bx(22, 8, 22, gold, 0, 276, 0), cy(10, 7, 10, gold, 0, 266, 0)); g.add(c); });
     // ковровая дорожка с золотой каймой
     g.add(plane(1300, 74, surface({ type: 'carpet', color: '#6b1d27', pattern: 'runner', rep: [30, 1], size: 128, rough: 1, normal: 2.5 }), 180, .6, 34, [-PI / 2, 0, 0]));
     // картины
@@ -362,7 +362,7 @@ const ZONES = {
     for (let k = 0; k < 10; k++) { const a = k / 10 * PI * 2; ch.add(cy(1.4, 1.4, 6, std('#f2efe6'), Math.cos(a) * 26, 4, Math.sin(a) * 26), mesh(new THREE.SphereGeometry(2.4, 10, 8), emis('#ffd88a', 3.5), Math.cos(a) * 26, 9, Math.sin(a) * 26, { cast: false }), halo('#ffd88a', 22, Math.cos(a) * 26, 9, Math.sin(a) * 26, .7)); }
     ch.add(halo('#ffd88a', 150, 0, 4, 0, .35)); g.add(ch);
     const lamps = [lamp(95, 0xffd88a, 1, 'bulb'), lamp(275, 0xffd88a, 1, 'bulb')];
-    const chandLight = new THREE.PointLight(0xffd88a, 22000, 500, 2); chandLight.position.set(185, 230, ZW + 50); g.add(chandLight);
+    const chandLight = new THREE.PointLight(0xffd88a, 15000, 500, 2); chandLight.position.set(185, 230, ZW + 50); g.add(chandLight);
     return { g, lamps, doorStyle: 'royal', liftTint: '#3a2e18', dust: .7, fog: [0x120c18, .0012], ambient: .85 };
   },
 };

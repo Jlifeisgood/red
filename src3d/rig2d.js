@@ -40,7 +40,7 @@ const HUMAN = {
     walk: t => { const a = t * PI * 2 / .8, s = Math.sin(a);
       return legs(Object.assign({}, HZ, { torso: -.09, head: .05, uarmN: .25 - .3 * s, farmN: 1.35, handN: .15, uarmF: .1 + .4 * s, farmF: .5 + .25 * Math.max(0, s), by: -1.6 + 1.8 * Math.abs(Math.cos(a)) }),
         .5 * s, -(.08 + .95 * Math.max(0, Math.sin(a + 1.3))), -.5 * s, -(.08 + .95 * Math.max(0, Math.sin(a + 1.3 + PI)))); },
-    attack: { dur: .55, k: [[.3, { uarmN: 2.8, farmN: .7, torso: .14, head: .1, thighN: .32, shinN: -.25, footN: -.07 }], [.46, { uarmN: -.15, farmN: .15, torso: -.38, head: -.12, thighN: .5, shinN: -.45, footN: -.05, thighF: -.4, shinF: -.1, footF: .45, uarmF: -.4 }], [.7, { uarmN: .1, farmN: .6, torso: -.2 }]] },
+    attack: { dur: .55, k: [[.3, { uarmN: 2.8, farmN: .7, handN: -.5, torso: .14, head: .1, thighN: .32, shinN: -.25, footN: -.07 }], [.46, { uarmN: -.1, farmN: .2, handN: 1.35, torso: -.38, head: -.12, thighN: .5, shinN: -.45, footN: -.05, thighF: -.4, shinF: -.1, footF: .45, uarmF: -.4 }], [.7, { uarmN: .15, farmN: .7, handN: .9, torso: -.2 }]] },
   },
   zombie: {
     idle: t => { const b = Math.sin(t * 1.7), j = Math.pow(Math.max(0, Math.sin(t * 6.3)), 12) * .14;
@@ -62,7 +62,7 @@ HUMAN.crawler = {
   attack: { dur: .7, k: [[.3, { head: 1.4, uarmN: 1.6, uarmF: 1.8 }], [.45, { head: .8, uarmN: 2.9, uarmF: 2.8, torso: -1.3 }]] },
 };
 const HIT = { dur: .38, k: [[.18, { torso: .32, head: .35, uarmF: .7, farmF: 1.2, bx: -3 }]] };
-const DEATH = { dur: 1.3, k: [[.35, { thighN: .9, shinN: -1.5, footN: .6, thighF: .7, shinF: -1.3, footF: .6, torso: -.35, head: -.3, by: -12, uarmN: .2, uarmF: .1 }], [.8, { rot: 1.48, by: -20, bx: -6, thighN: .3, shinN: -.3, footN: 0, thighF: .2, shinF: -.2, footF: 0, torso: .1, head: .5, uarmN: 2.2, farmN: .4, uarmF: -.6, farmF: .3 }], [.92, { rot: 1.52, by: -21 }]] };
+const DEATH = { dur: 1.3, k: [[.35, { thighN: .9, shinN: -1.5, footN: .6, thighF: .7, shinF: -1.3, footF: .6, torso: -.35, head: -.3, by: -12, uarmN: .2, uarmF: .1 }], [.8, { rot: 1.48, by: 8, bx: -8, thighN: .3, shinN: -.3, footN: 0, thighF: .2, shinF: -.2, footF: 0, torso: .1, head: .5, uarmN: 2.2, farmN: .4, uarmF: -.6, farmF: .3 }], [.92, { rot: 1.52, by: 9 }]] };
 const DEATH_CRAWL = { dur: 1, k: [[.6, { head: .2, torso: -1.52, uarmN: 1.7, uarmF: 2.8, by: -2 }]] };
 
 // ---------- позы зверя ----------

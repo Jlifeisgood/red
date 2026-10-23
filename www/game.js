@@ -1179,7 +1179,7 @@ function render() {
       a.appendChild(btn('← Назад', () => { S.screen = 'map'; render(); }, 'full'));
       break;
     case 'start': {
-      const ta = document.createElement('div'); ta.className = 'title-art'; ta.innerHTML = TITLE_SVG; a.appendChild(ta);
+      const ta = document.createElement('div'); ta.className = 'title-art'; ta.innerHTML = TITLE_SVG + '<div class="tt"><b>БАШНЯ</b><span>сто этажей до крыши</span></div>'; a.appendChild(ta);
       a.appendChild(btn(`Сложность: ${DIFFS[meta.diff]} (нажми, чтобы сменить)`, () => { meta.diff = (meta.diff + 1) % 3; saveMeta(); render(); }, 'full primary'));
       head(a, 'Пассивный перк (действует весь забег). Нажми ещё раз, чтобы снять:');
       PASSIVES.forEach(p => a.appendChild(unlockedAt(p.req)

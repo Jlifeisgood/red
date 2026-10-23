@@ -368,23 +368,36 @@ ART.enemy = (name) => {
 
 // ---------- заставка: силуэт башни ----------
 const TITLE_SVG = (() => {
+  // Обложка в духе графического романа: кровавый закат, растр-точки, башня тушью, тянущиеся руки мертвецов
   let win = '';
-  const lit = [[1, 3], [2, 6], [0, 9], [3, 12], [1, 15], [2, 18], [0, 21], [3, 24], [1, 27]];
-  for (let r = 0; r < 30; r++) for (let c = 0; c < 4; c++) {
-    const on = lit.some(([cc, rr]) => cc === c && rr === r) || (r * 7 + c * 3) % 11 === 0;
-    win += `<rect x="${112 + c * 26}" y="${38 + r * 10.4}" width="14" height="6" rx="1" fill="${on ? '#ffd36b' : '#10151d'}"/>`;
+  for (let r = 0; r < 26; r++) for (let c = 0; c < 4; c++) {
+    const k = (r * 7 + c * 3) % 13, on = k === 0 || k === 5 && r < 8, red = k === 9 && r > 12;
+    if (on || red) win += `<rect x="${133 + c * 22}" y="${64 + r * 11}" width="11" height="6" fill="${red ? '#d23a22' : '#ffd36b'}"/>`;
   }
-  return `<svg viewBox="0 0 360 380" width="100%" height="190" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-    <defs><linearGradient id="tSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0b1330"/><stop offset=".7" stop-color="#2d3a66"/><stop offset="1" stop-color="#4a3a5a"/></linearGradient>
-    <linearGradient id="tTow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#252d3d"/><stop offset="1" stop-color="#121722"/></linearGradient></defs>
+  let hands = '';
+  for (let i = 0; i < 14; i++) {
+    const x = 8 + i * 26 + (i % 3) * 5, h = 34 + (i * 37 % 29), t = (i % 2 ? -1 : 1) * (6 + i % 4 * 3);
+    hands += `<g transform="translate(${x} ${380 - h}) rotate(${t})"><path d="M-6 ${h} L-5 12 C-6 6 -9 2 -8 -4 L-6 -5 L-4 2 L-4 -9 L-1.6 -9 L-1 1 L.4 -11 L3 -10.6 L2.6 1 L4.8 -8 L7 -7.2 L5.6 4 L9 -1 L10.6 0 L6.6 12 L6 ${h} Z" fill="#050506"/></g>`;
+  }
+  return `<svg viewBox="0 0 360 380" width="100%" height="236" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+    <defs>
+      <linearGradient id="tSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a0907"/><stop offset=".45" stop-color="#6e1a10"/><stop offset=".78" stop-color="#c4501e"/><stop offset="1" stop-color="#e8a050"/></linearGradient>
+      <pattern id="tDots" width="6" height="6" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r="1.2" fill="#000" opacity=".28"/></pattern>
+      <linearGradient id="tFade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset=".7" stop-color="#fff" stop-opacity="0"/></linearGradient>
+      <mask id="tMask"><rect width="360" height="380" fill="url(#tFade)"/></mask>
+    </defs>
     <rect width="360" height="380" fill="url(#tSky)"/>
-    <g fill="#fff" opacity=".85"><circle cx="40" cy="40" r="1.4"/><circle cx="300" cy="60" r="1.2"/><circle cx="80" cy="120" r="1"/><circle cx="330" cy="140" r="1.4"/><circle cx="250" cy="30" r="1"/><circle cx="20" cy="190" r="1.2"/></g>
-    <circle cx="290" cy="78" r="22" fill="#fff4d0"/><circle cx="300" cy="72" r="19" fill="#2d3a66"/>
-    <path d="M0 380V300l30-14 24 10 28-24 30 18 24-12v102z" fill="#0a0d14"/><path d="M360 380V310l-34-16-26 12-28-20-30 16-20-8v86z" fill="#0a0d14"/>
-    <rect x="104" y="30" width="112" height="350" fill="url(#tTow)"/><rect x="104" y="30" width="112" height="6" fill="#3a4458"/>
-    <rect x="148" y="8" width="24" height="24" fill="#252d3d"/><rect x="158" y="-10" width="4" height="20" fill="#3a4458"/><circle cx="160" cy="-12" r="4" fill="#e6b422"/>
+    <circle cx="246" cy="214" r="74" fill="#f2d9a8"/><circle cx="246" cy="214" r="74" fill="url(#tDots)"/>
+    <rect width="360" height="380" fill="url(#tDots)" mask="url(#tMask)"/>
+    <g fill="none" stroke="#2a0805" stroke-width="2" opacity=".55"><path d="M0 120 L360 92"/><path d="M0 150 L360 128"/><path d="M0 178 L360 162"/></g>
+    <path d="M0 380 V298 L24 290 V262 L46 262 V284 L70 276 V250 L92 250 V292 L112 300 V380 Z M360 380 V286 L338 280 V246 L316 246 V270 L296 274 V300 L250 306 V380 Z" fill="#100605" stroke="#000" stroke-width="2"/>
+    <path d="M122 380 V52 L180 30 L236 52 V380 Z" fill="#0b0809" stroke="#000" stroke-width="3"/>
+    <path d="M180 30 V6 M172 14 H188" stroke="#000" stroke-width="3"/><circle cx="180" cy="5" r="3" fill="#ff3a22"/>
+    <path d="M126 52 L180 33 L232 52" stroke="#3a2420" stroke-width="2" fill="none"/>
+    <path d="M128 56 V378" stroke="#2a1a18" stroke-width="2"/>
     ${win}
-    <rect x="0" y="352" width="360" height="30" fill="#07090d"/>
-    <g fill="#ffd36b" opacity=".9"><rect x="14" y="320" width="4" height="4"/><rect x="40" y="326" width="4" height="4"/><rect x="304" y="324" width="4" height="4"/><rect x="332" y="318" width="4" height="4"/></g>
+    <g transform="translate(76 96) rotate(-8)"><path d="M-20 0 H22 L28 6 H-26 Z M0 0 V-6 M-30 -7 H32" stroke="#000" stroke-width="3" fill="#000"/><path d="M22 2 L40 -2" stroke="#000" stroke-width="2.5"/></g>
+    ${hands}
+    <rect x="0" y="372" width="360" height="8" fill="#050506"/>
   </svg>`;
 })();

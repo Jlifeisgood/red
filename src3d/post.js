@@ -6,6 +6,23 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 
+// Контуры тушью по разрывам глубины (лапласиан линейной глубины): рамы, двери, мебель обводятся как в комиксе.
+const InkShader = {
+  uniforms: { tDiffuse: { value: null }, tDepth: { value: null }, res: { value: new THREE.Vector2(1, 1) }, near: { value: 50 }, far: { value: 3000 }, k: { value: .9 } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: `
+    uniform sampler2D tDiffuse, tDepth; uniform vec2 res; uniform float near, far, k; varying vec2 vUv;
+    float lz(vec2 uv) { float d = texture2D(tDepth, uv).x; return near * far / (far - d * (far - near)); }
+    void main() {
+      vec4 c = texture2D(tDiffuse, vUv);
+      vec2 px = 1.25 / res;
+      float z = lz(vUv);
+      float lap = abs(lz(vUv + vec2(px.x, 0.)) + lz(vUv - vec2(px.x, 0.)) + lz(vUv + vec2(0., px.y)) + lz(vUv - vec2(0., px.y)) - 4. * z);
+      float e = smoothstep(.0035, .012, lap / z) * step(z, far * .9);
+      gl_FragColor = vec4(c.rgb * (1. - e * k), c.a);
+    }`,
+};
+
 // Работает уже в sRGB после OutputPass: всё, что «плёночное», делаем здесь.
 const GradeShader = {
   uniforms: {
@@ -35,16 +52,20 @@ const GradeShader = {
 
 export function makePost(renderer, scene, camera) {
   const rt = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, samples: 4 });
+  rt.depthTexture = new THREE.DepthTexture(4, 4); rt.depthTexture.type = THREE.UnsignedIntType;
   const composer = new EffectComposer(renderer, rt);
   composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), .55, .5, .82);
+  const ink = new ShaderPass(InkShader);
+  ink.uniforms.tDepth.value = composer.renderTarget2.depthTexture;
+  composer.addPass(ink);
+  const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), .42, .45, 1.05);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
   const grade = new ShaderPass(GradeShader);
   composer.addPass(grade);
   return {
-    composer, bloom, grade,
-    setSize(w, h, pr) { composer.setPixelRatio(pr); composer.setSize(w, h); grade.uniforms.res.value.set(w * pr, h * pr); },
-    render(t, hurt) { grade.uniforms.time.value = t; grade.uniforms.hurt.value = hurt; composer.render(); },
+    composer, bloom, grade, ink,
+    setSize(w, h, pr) { composer.setPixelRatio(pr); composer.setSize(w, h); grade.uniforms.res.value.set(w * pr, h * pr); ink.uniforms.res.value.set(w * pr, h * pr); },
+    render(t, hurt) { grade.uniforms.time.value = t; grade.uniforms.hurt.value = hurt; ink.uniforms.tDepth.value = composer.readBuffer.depthTexture || composer.renderTarget2.depthTexture; composer.render(); },
   };
 }
