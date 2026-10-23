@@ -99,6 +99,36 @@ function fadeThen(caption, fn, hold = 900) {
   setTimeout(() => { f.className = ''; sceneBusy = false; }, 700 + hold + 500);
 }
 
+// ---------- подсказки первого забега: показываются по одной и только один раз ----------
+const TIPS = [
+  { id: 'room', when: () => S.screen === 'map' && S.rooms.some(r => r && !r.done), at: () => { const cs = S.rooms.map((r, i) => r && !r.done ? COMPS[roomComp(i)] : null).filter(Boolean).sort((a, b) => Math.abs((a.x0 + a.x1) / 2 - heroX) - Math.abs((b.x0 + b.x1) / 2 - heroX)); const c = cs[0]; return { wx: (c.x0 + c.x1) / 2, wy: FLOOR_Y - ROOM_H / 2 + 34 }; }, t: 'Нажми на тёмную комнату — герой войдёт и осмотрит её' },
+  { id: 'lift', when: () => S.screen === 'map' && S.rooms.filter(r => r && r.done).length >= 2, at: () => ({ wx: LIFT_X, wy: FLOOR_Y - 150 }), t: 'Лифт везёт выше. Сломанный можно починить или обойти по лестнице' },
+  { id: 'bag', when: () => S.screen === 'map' && S.floor >= 2, el: () => document.querySelector('#dock .bag'), t: 'Рюкзак: еда, лечение, верстак и навыки' },
+  { id: 'aim', when: () => S.screen === 'fight', el: () => document.querySelector('#dock .aimbtn'), t: 'Нажми на прицел и выбери, куда бить. Можно бить и прямо по врагу' },
+  { id: 'base', when: () => S.screen === 'base', at: () => ({ wx: (COMPS[0].x0 + COMPS[0].x1) / 2, wy: FLOOR_Y - ROOM_H / 2 + 30 }), t: 'Убежище: нажми на спальню, кухню или мастерскую' },
+];
+let tipT = 0, tipOn = null;
+function hideTip() { const el = $('tip'); if (el) el.className = ''; tipOn = null; }
+function maybeTip() {
+  if (tipOn) { const cur = TIPS.find(x => x.id === tipOn); if (cur && !cur.when()) hideTip(); return; }   // обстановка сменилась — подсказка уже не к месту
+  if (sceneBusy || !meta || S.over) return;
+  meta.tips = meta.tips || {};
+  const tp = TIPS.find(x => !meta.tips[x.id] && x.when());
+  if (!tp) return;
+  const el = $('tip'), sc = $('scene').getBoundingClientRect();
+  let x, y, below = false;
+  if (tp.el) { const e = tp.el(); if (!e) return; const r = e.getBoundingClientRect(); x = r.left + r.width / 2 - sc.left; y = r.top - sc.top - 10; }
+  else { const p = tp.at(); x = (p.wx - VIEW.x) / VIEW.w * sc.width; y = (p.wy - VIEW.y) / VIEW.h * sc.height; below = true; }
+  meta.tips[tp.id] = 1; saveMeta(); tipOn = tp.id;
+  el.querySelector('span').textContent = tp.t;
+  el.style.left = Math.max(110, Math.min(sc.width - 110, x)) + 'px'; el.style.top = y + 'px';
+  el.style.setProperty('--ax', (x - Math.max(110, Math.min(sc.width - 110, x))) + 'px');
+  el.className = 'show' + (below ? ' below' : '');
+  clearTimeout(tipT); tipT = setTimeout(hideTip, 6500);
+}
+document.addEventListener('pointerdown', () => { if (tipOn) setTimeout(hideTip, 150); }, true);
+setInterval(() => { try { if (S && $('scene').style.visibility !== 'hidden') maybeTip(); } catch (e) {} }, 1200);
+
 // ---------- перемещение героя ----------
 function setHero(x, walk, instant) {
   const h = $('hero');

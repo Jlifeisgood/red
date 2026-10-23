@@ -268,3 +268,11 @@ textarea { grid-column:1/-1; background:#0b0e13; color:var(--text); border:1px s
 #fade.on { opacity:1; pointer-events:auto; }
 #fade span { font:italic 500 18px/1 var(--cond); color:#c8bea6; letter-spacing:1px; opacity:0; transition:opacity .5s; }
 #fade.cap span { opacity:1; }
+
+/* подсказка первого забега */
+#tip { position:absolute; z-index:9; transform:translate(-50%,-100%) translateY(6px); max-width:230px; padding:8px 12px; background:#e8dcc0; color:#16130e; border-radius:6px;
+  font:600 13.5px/1.3 var(--cond); box-shadow:0 6px 20px rgba(0,0,0,.6); opacity:0; pointer-events:none; transition:opacity .3s, transform .3s; }
+#tip::after { content:''; position:absolute; left:calc(50% + var(--ax, 0px)); bottom:-7px; margin-left:-7px; border:7px solid transparent; border-bottom:0; border-top-color:#e8dcc0; }
+#tip.show { opacity:1; transform:translate(-50%,-100%); animation:tipb 1.6s ease-in-out .4s infinite; }
+#tip.below { transform:translate(-50%,-50%); } #tip.below.show { transform:translate(-50%,-50%); } #tip.below::after { display:none; }
+@keyframes tipb { 50% { margin-top:-4px; } }
