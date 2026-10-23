@@ -12,7 +12,7 @@ const LAYOUT = { comps: COMPS, floorY: FLOOR_Y, roomH: ROOM_H, slab: SLAB, liftX
 const ROOM_ICON = { loot: 'crate', enemy: 'skull', rest: 'bed', trap: 'warn', trader: 'case', event: 'help', vending: 'cup', locked: 'lock' };
 
 let heroX = HERO_HOME, sceneBusy = false, sceneKey = null, sceneMode = '', heroKey = '', foeKey = '', walkMs = 520;
-let curComp = 2, liftOpen = false, revealing = -1, introT = [];
+let curComp = 2, liftOpen = false, revealing = -1, introT = [], prevFloor = null, pendingSlide = null, arriveBy = 'lift';
 const FIGHT = { hx: 0, fx: 0, dir: 1 };
 try { if (localStorage.getItem('tower-fast') === '1') walkMs = 260; } catch (e) {}
 
@@ -107,16 +107,37 @@ function walkThen(x, fn) {
 function enterDoor(i) {
   const r = S.rooms[i];
   if (S.screen !== 'map' || !r) return;
-  const c = COMPS[roomComp(i)];
-  if (r.done) return walkThen(entryX(c), () => render());
-  walkThen(entryX(c), () => { sfx('door'); revealing = i; setTimeout(() => { revealing = -1; }, 900); openRoom(i); });
+  const c = COMPS[roomComp(i)], mid = (c.x0 + c.x1) / 2 + (leftOfHall(c) ? 14 : -14);
+  if (r.done) return walkThen(mid, () => render());
+  // враг встречает у порога; остальные комнаты герой обыскивает — присаживается и шарит руками
+  if (r.type === 'enemy' || r.type === 'trap') return walkThen(entryX(c), () => { sfx('door'); revealing = i; setTimeout(() => { revealing = -1; }, 900); openRoom(i); });
+  walkThen(mid, () => {
+    sfx('door'); revealing = i; render(); sceneBusy = true;
+    if (window.GL3D) GL3D.trigger('hero', 'search');
+    setTimeout(() => { sceneBusy = false; revealing = -1; openRoom(i); }, r.type === 'locked' && S.keys <= 0 ? 150 : 700);
+  });
+}
+// подойти к лифту, войти в кабину и уехать (подъём, спуск в убежище, возврат)
+function liftTrip(fn) {
+  walkThen(LIFT_X, () => {
+    sfx('ding'); liftOpen = true; render(); sceneBusy = true;
+    setTimeout(() => { $('hero').classList.add('boarding'); }, 350);
+    setTimeout(() => { liftOpen = false; render(); }, 750);
+    setTimeout(() => { sceneBusy = false; $('hero').classList.remove('boarding'); arriveBy = 'lift'; fn(); }, 1000);
+  });
 }
 function rideAnim() {
   if (S.screen !== 'map' || !S.lift || S.lift.state !== 'ok') return;
-  walkThen(LIFT_X, () => {
-    sfx('ding'); liftOpen = true; render();
-    setTimeout(() => { $('hero').classList.add('boarding'); }, 350);
-    setTimeout(() => { liftOpen = false; $('hero').classList.remove('boarding'); ride(); }, 900);
+  liftTrip(ride);
+}
+// подъём по лестничной клетке: герой поднимается по маршу и скрывается за перекрытием
+function climbAnim(fn) {
+  walkThen(HALL.x0 + 18, () => {
+    const h = $('hero'); sceneBusy = true;
+    h.classList.remove('face-l'); h.classList.add('walk');
+    h.style.transitionDuration = '1500ms'; h.style.transform = `translate(${HALL.x0 + 150}px,${FLOOR_Y - ROOM_H - 10}px)`;
+    const steps = setInterval(() => sfx('step'), 190);
+    setTimeout(() => { clearInterval(steps); sceneBusy = false; h.classList.remove('walk'); arriveBy = 'stairs'; fn(); }, 1550);
   });
 }
 function sceneTap(i) {
@@ -129,7 +150,7 @@ function sceneTap(i) {
     }
     if (typeof i === 'number') enterDoor(i);
   } else if (S.screen === 'base' && S.inBase) {
-    if (i === 'lift') return walkThen(LIFT_X, returnUp);
+    if (i === 'lift') return liftTrip(returnUp);
     const c = COMPS[BASE_COMP[i]]; if (!c) return;
     if (i === 'f0') return walkThen(entryX(c), sleep);
     if (i === 'f1') return walkThen(entryX(c), () => { S.screen = 'kitchen'; render(); });
@@ -184,11 +205,22 @@ function renderScene() {
   if (sceneKey !== rk) {
     sceneKey = rk; sceneBusy = false; curComp = 2; revealing = -1;
     $('bg').innerHTML = svgBuilding(inBase, zone);
-    heroX = LIFT_X; setHero(LIFT_X, false, true); $('hero').classList.add('boarding');
-    liftOpen = true;
+    // соседний этаж или убежище — этаж въезжает в кадр, будто едем вместе с кабиной
+    const pf = prevFloor; prevFloor = { floor: S.floor, base: inBase };
+    pendingSlide = !pf ? null : pf.base !== inBase && pf.floor === S.floor ? (inBase ? 'down' : 'up') : !inBase && !pf.base && S.floor - pf.floor === 1 ? 'up' : null;
+    const wait = pendingSlide ? 1050 : 0, stairs = arriveBy === 'stairs' && !inBase; arriveBy = 'lift';
     introT.forEach(clearTimeout);
-    introT = [setTimeout(() => { $('hero').classList.remove('boarding'); $('hero').style.transitionDuration = '650ms'; setHero(HERO_HOME, true); }, 260),
-      setTimeout(() => { $('hero').classList.remove('walk'); liftOpen = false; introT = []; render(); }, 950)];
+    if (stairs) {                                         // пришёл по лестнице: выходит из лестничного проёма
+      heroX = HALL.x0 + 22; setHero(HALL.x0 + 22, false, true); $('hero').classList.add('boarding'); liftOpen = false;
+      introT = [setTimeout(() => { $('hero').classList.remove('boarding'); $('hero').style.transitionDuration = '520ms'; setHero(HERO_HOME, true); }, wait + 60),
+        setTimeout(() => { $('hero').classList.remove('walk'); introT = []; render(); }, wait + 620)];
+    } else {
+      heroX = LIFT_X; setHero(LIFT_X, false, true); $('hero').classList.add('boarding');
+      liftOpen = !pendingSlide;
+      introT = [setTimeout(() => { liftOpen = true; render(); }, Math.max(0, wait - 150)),
+        setTimeout(() => { $('hero').classList.remove('boarding'); $('hero').style.transitionDuration = '650ms'; setHero(HERO_HOME, true); }, wait + 260),
+        setTimeout(() => { $('hero').classList.remove('walk'); liftOpen = false; introT = []; render(); }, wait + 950)];
+    }
   }
   // герой (запасная SVG-графика)
   const hk = S.wi + ':' + S.ai;
@@ -247,6 +279,7 @@ function renderScene() {
     visible: true, layout: LAYOUT, floorKey: (inBase ? 'base' : 'z' + zone) + ':' + S.floor + ':' + (inBase ? '' : S.rooms.map(r => r && r.type).join(',')),
     zone: 'z' + zone, floor: S.floor, base: inBase, rooms: S.rooms, heroComp: curComp, revealing, liftOk: ok, liftOpen,
     wi: S.wi, ai: S.ai, enemy: fight ? S.enemy.n : null, foeX: FIGHT.fx, foeY: FOE_Y, foeDir: -FIGHT.dir, heroDir: FIGHT.dir, fight, dead: S.screen === 'dead',
-    npc: fight ? null : npc, npcX, npcDir,
+    npc: fight ? null : npc, npcX, npcDir, slide: pendingSlide,
   });
+  pendingSlide = null;
 }

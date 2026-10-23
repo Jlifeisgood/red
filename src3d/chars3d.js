@@ -91,7 +91,7 @@ function enemyModel(name) {
 
 // ---------- сцена ----------
 let renderer, scene, camera, canvas, hostEl, post = null;
-let bld = null, bldKey = '', hurt = 0, lastState = null;
+let bld = null, bldKey = '', hurt = 0, lastState = null, slide = null;
 let hero = null, foe = null, npc = null, dying = [], heroKey = '', foeKey = '', npcKey = '', view = '', lastDraw = 0;
 GL.quality = 'high';
 try { GL.quality = localStorage.getItem('tower-q') || 'high'; } catch (e) {}
@@ -168,6 +168,8 @@ function frame(ts) {
     if (d.left <= 0) { disposeHolder(d); return false; } return true;
   });
   if (bld && lastState) bld.update(dt, lastState);
+  if (slide && bld) { const t = Math.min(1, (performance.now() - slide.t0) / slide.dur), e = t < .5 ? 4 * t ** 3 : 1 - Math.pow(-2 * t + 2, 3) / 2; bld.root.position.y = slide.from * (1 - e); if (t >= 1) slide = null; }   // по часам, а не по кадрам: синхронно с выходом героя
+  updateBlood(dt);
   hurt = Math.max(0, hurt - dt * 1.6);
   if (GL.quality !== 'low' && post) post.render(t, hurt); else renderer.render(scene, camera);
 }
@@ -181,6 +183,9 @@ GL.update = (o) => {
     bldKey = o.floorKey;
     if (bld) { scene.remove(bld.root); bld.dispose(); bld = null; }
     try { bld = buildBuilding({ zone: o.zone, floor: o.floor, base: o.base, rooms: o.rooms }, o.layout); scene.add(bld.root); } catch (e) { console.error(e); bld = null; }
+    // поездка на лифте: новый этаж въезжает сверху (подъём) или снизу (спуск в убежище), будто камера едет вместе с кабиной
+    blood.length = 0;
+    if (bld && o.slide) { const d = o.layout.roomH + o.layout.slab; slide = { t0: performance.now(), dur: 1050, from: o.slide === 'up' ? d : -d }; bld.root.position.y = slide.from; } else slide = null;
   }
   hostEl.classList.toggle('env', !!bld);
   const hk = o.wi + ':' + o.ai;
@@ -214,8 +219,9 @@ GL.trigger = (who, kind) => {
   if (!GL.ready || !GL.enabled) return;
   const h = who === 'hero' ? hero : foe; if (!h) return;
   if (kind === 'attack') { h.st.atk = 0; h.ctl.once('attack'); }
-  else if (kind === 'hurt') { h.st.flash = 1; h.ctl.once('hit'); if (who === 'hero') hurt = 1; }
-  else if (kind === 'death') { h.dyingStarted = true; h.ctl.once('death'); }
+  else if (kind === 'hurt') { h.st.flash = 1; h.ctl.once('hit'); if (who === 'hero') hurt = 1; sprayBlood(h.root.position.x, h.root.position.y + 82 * (h.model.kind === 'quad' ? .5 : 1), -h.st.dir, 8 + (Math.random() * 7 | 0)); }
+  else if (kind === 'death') { h.dyingStarted = true; h.ctl.once('death'); if (bld) { const x = h.root.position.x; setTimeout(() => bld && bld.stamp(x + h.st.dir * 20, 0, 16, 'pool'), 700); } }
+  else if (kind === 'search') h.ctl.once('search');
 };
 function setupRenderer(r) { r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.NoToneMapping; }
 GL.init = () => {
@@ -232,6 +238,33 @@ GL.init = () => {
     if (typeof render === 'function') render();
   } catch (e) { console.error(e); GL.ready = false; if (hostEl) hostEl.classList.remove('gl'); }
 };
+
+// ---------- кровь: брызги летят от удара и остаются на стене и полу комнаты ----------
+const blood = [];
+let bloodPts = null;
+function sprayBlood(x, y, dir, n) {
+  for (let i = 0; i < n; i++) {
+    const a = (Math.random() - .5) * 1.4 + (dir > 0 ? 0 : Math.PI) - dir * .35, v = 60 + Math.random() * 170;
+    blood.push({ x, y: y + (Math.random() - .5) * 14, vx: Math.cos(a) * v, vy: Math.sin(a) * v * .8 + 40 + Math.random() * 80, life: 1.4, wall: Math.random() < .3 ? .06 + Math.random() * .3 : 9, r: .6 + Math.random() * 1.2 });
+  }
+}
+function updateBlood(dt) {
+  if (!bloodPts) {
+    bloodPts = new THREE.Points(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(200 * 3), 3)),
+      new THREE.PointsMaterial({ color: 0x7a0a06, size: 3.2, sizeAttenuation: false, transparent: true, opacity: .95, depthWrite: false }));
+    bloodPts.frustumCulled = false; bloodPts.renderOrder = 40; scene.add(bloodPts);
+  }
+  const P = bloodPts.geometry.attributes.position, floorY = lastState ? -lastState.layout.floorY + 3 : -400;
+  for (let i = blood.length - 1; i >= 0; i--) {
+    const b = blood[i]; b.life -= dt; b.wall -= dt;
+    b.vy -= 520 * dt; b.x += b.vx * dt; b.y += b.vy * dt;
+    let hit = null;
+    if (b.wall <= 0) hit = 'wall'; else if (b.y <= floorY) hit = 'floor';
+    if (hit || b.life <= 0) { if (hit && bld) bld.stamp(b.x, -Math.max(b.y, floorY), b.r * (hit === 'wall' ? 1.4 : 2), hit); blood.splice(i, 1); }
+  }
+  for (let i = 0; i < 200; i++) { const b = blood[i]; if (b) P.setXYZ(i, b.x, b.y, 5); else P.setXYZ(i, 0, -99999, 0); }
+  P.needsUpdate = true;
+}
 
 // ---------- рисование персонажа на 2D-холсте (портреты HUD, выбор цели) ----------
 // region: 'head' | 'body' | 'arms' | 'legs' — подсветить часть тела красным

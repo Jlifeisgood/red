@@ -130,7 +130,7 @@ export function buildBuilding(o, L) {
     const p = plane(W, H, mat, (cp.x0 + cp.x1) / 2, yc(FY - H / 2), -10);
     const dark = cp.k === 'room' && !o.base ? plane(W, H, new THREE.MeshBasicMaterial({ color: 0x030304, transparent: true, opacity: .96, depthWrite: false }), (cp.x0 + cp.x1) / 2, yc(FY - H / 2), -6) : null;
     if (dark) dark.renderOrder = 5;
-    rooms.push({ cp, mat, dark, glow: 0, open: 0 });
+    rooms.push({ cp, mat, tex, dark, glow: 0, open: 0 });
   });
   // перегородки между отсеками
   for (let i = 1; i < L.comps.length; i++) { const x = (L.comps[i - 1].x1 + L.comps[i].x0) / 2, w = L.comps[i].x0 - L.comps[i - 1].x1 + 2; plane(w, H, new THREE.MeshBasicMaterial({ color: 0x101112 }), x, yc(FY - H / 2), -8); }
@@ -153,6 +153,17 @@ export function buildBuilding(o, L) {
   }
   // небо, облака и дождь снаружи
   const sky = plane(4000, 2400, basic(skyTex()), (bx0 + bx1) / 2, yc(FY - 200), -60);
+  // молния: ломаная от облаков вниз, видна доли секунды
+  const boltG = new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(64 * 3), 3));
+  const bolt = new THREE.Line(boltG, new THREE.LineBasicMaterial({ color: 0xe8f0ff, transparent: true, opacity: 0 })); bolt.frustumCulled = false; root.add(bolt);
+  let flash = 0, nextBolt = 4 + Math.random() * 8;
+  const strike = () => {
+    const side = Math.random() < .5 ? bx0 - 60 - Math.random() * 260 : bx1 + 60 + Math.random() * 260, P = boltG.attributes.position;
+    let x = side, y = FY - 700; const n = 22;
+    for (let i = 0; i < n; i++) { P.setXYZ(i, x, yc(y), -50); x += (Math.random() - .5) * 46; y += 38 + Math.random() * 20; }
+    boltG.setDrawRange(0, n); P.needsUpdate = true;
+    flash = 1; window.dispatchEvent(new CustomEvent('tower-thunder', { detail: { near: Math.random() } }));
+  };
   const rainN = 260, rp = new Float32Array(rainN * 6), rv = [];
   for (let i = 0; i < rainN; i++) { const x = bx0 - 900 + Math.random() * (bwid + 1800); rv.push([x, Math.random() * 1200, 300 + Math.random() * 200]); }
   const rain = new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(rp, 3)), new THREE.LineBasicMaterial({ color: 0x8aa0b8, transparent: true, opacity: .35 }));
@@ -162,13 +173,16 @@ export function buildBuilding(o, L) {
   const doorTex = canvas(32, 128, c => { block(c, 0, 0, 32, 128, '#8a9096'); R(c, 3, 10, 26, 1, '#6a7076'); R(c, 3, 116, 26, 1, '#6a7076'); R(c, 4, 0, 2, 128, 'rgba(255,255,255,.12)'); });
   const doorM = basic(doorTex);
   const dl = plane(32, 128, doorM, lx - 16, yc(ly - 64), -9), dr = plane(32, 128, doorM, lx + 16, yc(ly - 64), -9);
-  const brokenTex = canvas(66, 130, c => {
-    c.fillStyle = '#6e7378'; c.beginPath(); c.moveTo(2, 4); c.lineTo(30, 0); c.lineTo(26, 40); c.lineTo(34, 70); c.lineTo(24, 128); c.lineTo(2, 126); c.closePath(); c.fill();
-    c.fillStyle = '#7d8388'; c.beginPath(); c.moveTo(36, 2); c.lineTo(64, 6); c.lineTo(62, 126); c.lineTo(38, 128); c.lineTo(44, 80); c.lineTo(34, 44); c.closePath(); c.fill();
-    c.strokeStyle = '#3a3e42'; c.lineWidth = 1; [[4, 30, 24, 50], [6, 90, 22, 70], [40, 20, 60, 40], [42, 100, 60, 80], [10, 60, 26, 64]].forEach(([a, b, d, e]) => { c.beginPath(); c.moveTo(a, b); c.lineTo(d, e); c.stroke(); });
-    c.fillStyle = 'rgba(255,255,255,.1)'; c.beginPath(); c.moveTo(6, 6); c.lineTo(24, 4); c.lineTo(20, 40); c.closePath(); c.fill();
+  // неисправный лифт: створки закрыты и заклеены лентой «не работает»
+  const brokenTex = canvas(76, 128, c => {
+    c.save(); c.translate(38, 64);
+    [[-.5, -18], [.42, 22]].forEach(([a, y]) => { c.save(); c.translate(0, y); c.rotate(a); c.fillStyle = '#d9ad1f'; c.fillRect(-46, -6, 92, 12); c.fillStyle = '#15171c';
+      for (let i = -46; i < 46; i += 10) { c.beginPath(); c.moveTo(i, -6); c.lineTo(i + 5, -6); c.lineTo(i + 1, 6); c.lineTo(i - 4, 6); c.fill(); }
+      c.fillStyle = 'rgba(0,0,0,.25)'; c.fillRect(-46, 4, 92, 2); c.restore(); });
+    c.restore();
+    c.fillStyle = '#efe8d8'; c.fillRect(20, 52, 36, 18); c.fillStyle = '#a8281e'; c.font = '700 7px sans-serif'; c.textAlign = 'center'; c.fillText('НЕ', 38, 60); c.fillText('РАБОТАЕТ', 38, 68);
   });
-  const broken = plane(66, 130, basic(brokenTex, { transparent: true }), lx, yc(ly - 65), -8.9);
+  const broken = plane(76, 128, basic(brokenTex, { transparent: true, opacity: 0 }), lx, yc(ly - 64), -8.8);
   const lampM = new THREE.MeshBasicMaterial({ color: 0xff3020 }); const lamp = plane(5, 5, lampM, lx, yc(ly - 143), -8.5);
   const num = canvas(40, 14, c => {}); const numM = basic(num); plane(36, 12, numM, lx, yc(ly - 143), -8.6);
   const drawNum = (txt, ok) => { const x = num.image.getContext('2d'); x.setTransform(PXB, 0, 0, PXB, 0, 0); R(x, 0, 0, 40, 14, '#060708'); x.fillStyle = ok ? '#7dff9a' : '#ff5a3a'; x.font = '700 10px monospace'; x.textAlign = 'center'; x.fillText(txt, 20, 11); num.needsUpdate = true; };
@@ -192,15 +206,38 @@ export function buildBuilding(o, L) {
       });
       const hc = rooms[s.heroComp]; if (hc) { glow.position.set((hc.cp.x0 + hc.cp.x1) / 2, yc(FY - H + 40), -7); glow.material.opacity = .5 * hc.open; }
       // лифт
-      const ok = !!s.liftOk; dl.visible = dr.visible = ok; broken.visible = !ok;
+      const ok = !!s.liftOk;
       liftOpen += ((s.liftOpen ? 1 : 0) - liftOpen) * Math.min(1, dt * 6);
+      broken.material.opacity += ((!ok && liftOpen < .05 ? 1 : 0) - broken.material.opacity) * Math.min(1, dt * 4); broken.visible = broken.material.opacity > .01;
       dl.position.x = lx - 16 - liftOpen * 28; dr.position.x = lx + 16 + liftOpen * 28;
       lampM.color.set(ok ? 0x5cff7a : (Math.sin(time * 7) > .2 ? 0xff3020 : 0x401010));
       const nk = (ok ? String(o.floor) : '--') + ok; if (nk !== numKey) { numKey = nk; drawNum(ok ? String(o.floor) : '--', ok); }
+      // гроза: вспышка неба, силуэт здания и отблеск на соседних этажах
+      nextBolt -= dt; if (nextBolt <= 0) { strike(); nextBolt = 7 + Math.random() * 14; }
+      if (flash > 0) {
+        flash = Math.max(0, flash - dt * 2.6);
+        const f = flash > .7 ? 1 : flash > .5 ? .25 : flash > .35 ? .8 : flash * .6;
+        sky.material.color.setScalar(1 + f * 3.2); bolt.material.opacity = flash > .45 ? 1 : 0;
+        neighbours.forEach(m => m.color.setRGB(.13 + f * .22, .13 + f * .24, .15 + f * .3));
+      } else if (bolt.material.opacity) { bolt.material.opacity = 0; sky.material.color.setScalar(1); neighbours.forEach(m => m.color.setRGB(.13, .13, .15)); }
       // дождь
       const p = rain.geometry.attributes.position;
       for (let i = 0; i < rainN; i++) { const v = rv[i]; v[1] += v[2] * dt; if (v[1] > 1200) v[1] = 0; const y = FY - 700 + v[1]; p.setXYZ(i * 2, v[0], yc(y), -40); p.setXYZ(i * 2 + 1, v[0] - 3, yc(y + 16), -40); }
       p.needsUpdate = true;
+    },
+    // пятно крови прямо на рисунке комнаты: kind 'wall' — брызги на стене, 'floor' — капли на полу, 'pool' — лужа
+    stamp(x, sy, r, kind) {
+      const rm = rooms.find(q => x >= q.cp.x0 && x <= q.cp.x1); if (!rm) return;
+      const c = rm.tex.image.getContext('2d'), u = x - rm.cp.x0, v = sy - (FY - H);
+      c.setTransform(PXB, 0, 0, PXB, 0, 0);
+      if (kind === 'pool') { c.fillStyle = 'rgba(70,4,3,.85)'; c.beginPath(); c.ellipse(u, H - 3, r * 1.8, r * .28, 0, 0, 7); c.fill(); c.fillStyle = 'rgba(120,20,16,.4)'; c.beginPath(); c.ellipse(u - r * .4, H - 3.4, r * .6, r * .08, 0, 0, 7); c.fill(); }
+      else if (kind === 'floor') { c.fillStyle = 'rgba(80,6,4,.8)'; c.beginPath(); c.ellipse(u, Math.min(H - 2, v), r, r * .3, 0, 0, 7); c.fill(); }
+      else {
+        c.fillStyle = 'rgba(96,8,6,.82)'; c.beginPath(); c.arc(u, v, r, 0, 7); c.fill();
+        for (let i = 0; i < 4; i++) { c.beginPath(); c.arc(u + (Math.random() - .5) * r * 4, v + (Math.random() - .5) * r * 3, r * (.2 + Math.random() * .35), 0, 7); c.fill(); }
+        if (Math.random() < .6) { const l = r * (2 + Math.random() * 6); c.fillRect(u - .4, v, .9, l); c.beginPath(); c.arc(u, v + l, .7, 0, 7); c.fill(); }
+      }
+      c.setTransform(1, 0, 0, 1, 0, 0); rm.tex.needsUpdate = true;
     },
     dispose() { root.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) { if (o.material.map && o.material.map !== SLABT && o.material.map !== SKYT) o.material.map.dispose(); o.material.dispose(); } }); },
   };

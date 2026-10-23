@@ -114,7 +114,7 @@ const PARTS = {
 const HELP = [
   '⚡ Энергия — твои шаги. Каждая дверь и каждый подъём тратят её. На нуле ты теряешь здоровье. Еда и блюда её восстанавливают.',
   '🚪 На этаже три двери и лифт. Подсказки у дверей могут лгать. Комнаты: склады, враги, убежища, ловушки, торговцы, события, автоматы и запертые двери.',
-  '🛗 Исправный лифт везёт наверх. Сломанный чинят материалами или обходят по тросу (дорого и опасно). Исправный лифт также ведёт вниз, в убежище.',
+  '🛗 Исправный лифт везёт наверх. Сломанный чинят материалами или обходят по заваленной лестнице (дорого и опасно). Исправный лифт также ведёт вниз, в убежище.',
   '🏠 Убежище: сон лечит, кухня готовит блюда, верстак создаёт снаряжение. Верстак и кухню можно улучшать.',
   '⚔️ В бою целься: голова бьёт сильнее, но чаще промахивается. Руки ослабляют врага, ноги сбивают его с шага. Смотри на особенности врагов.',
   '⭐ За уровень даются очки навыков. У каждого оружия свой навык, и он делает его сильнее. Перки выбираются при повышении уровня.',
@@ -194,6 +194,7 @@ function tone(freq, dur, type = 'square', vol = 0.07, slide = 0, delay = 0) {
   try {
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state === 'suspended') audioCtx.resume();
+    startAmbience();
     const t = audioCtx.currentTime + delay;
     const o = audioCtx.createOscillator(), g = audioCtx.createGain();
     o.type = type;
@@ -222,6 +223,38 @@ const SFX = {
   win:     () => [392, 523, 659, 784, 1047].forEach((f, i) => tone(f, 0.2, 'triangle', 0.09, 0, i * 0.14)),
 };
 const sfx = n => { try { SFX[n](); } catch (e) {} };
+// ---------- атмосфера: шум дождя за стенами и раскаты грома после молний ----------
+let rainNode = null;
+const NOISE = {};
+function noiseBuf(sec) {
+  if (NOISE[sec]) return NOISE[sec];
+  const n = Math.floor(audioCtx.sampleRate * sec), b = audioCtx.createBuffer(1, n, audioCtx.sampleRate), d = b.getChannelData(0);
+  let last = 0; for (let i = 0; i < n; i++) { const w = Math.random() * 2 - 1; last = last * .6 + w * .4; d[i] = last; }
+  return NOISE[sec] = b;
+}
+function startAmbience() {
+  if (muted || rainNode || !audioCtx) return;
+  try {
+    const src = audioCtx.createBufferSource(); src.buffer = noiseBuf(3); src.loop = true;
+    const bp = audioCtx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1200; bp.Q.value = .45;
+    const g = audioCtx.createGain(); g.gain.setValueAtTime(0, audioCtx.currentTime); g.gain.linearRampToValueAtTime(.05, audioCtx.currentTime + 4);
+    src.connect(bp); bp.connect(g); g.connect(audioCtx.destination); src.start();
+    rainNode = { src, g };
+  } catch (e) {}
+}
+function stopAmbience() { if (!rainNode) return; try { rainNode.src.stop(); } catch (e) {} rainNode = null; }
+function thunder(near) {
+  if (muted || !audioCtx) return;
+  try {
+    const t = audioCtx.currentTime + .3 + (1 - near) * 1.5;
+    const src = audioCtx.createBufferSource(); src.buffer = noiseBuf(3);
+    const lp = audioCtx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.setValueAtTime(700 + near * 600, t); lp.frequency.exponentialRampToValueAtTime(90, t + 2.6);
+    const g = audioCtx.createGain(); g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.5 * (.35 + near * .65), t + .06 + (1 - near) * .3); g.gain.exponentialRampToValueAtTime(.0001, t + 2.9);
+    src.connect(lp); lp.connect(g); g.connect(audioCtx.destination); src.start(t); src.stop(t + 3);
+    if (near > .8) setTimeout(() => vib(30), (t - audioCtx.currentTime) * 1000);
+  } catch (e) {}
+}
+window.addEventListener('tower-thunder', e => thunder(e.detail ? e.detail.near : .5));
 const FONTS = [['Мелкий', 0.9], ['Обычный', 1], ['Крупный', 1.15]];
 let fontIdx = 1;
 try { const f = parseInt(localStorage.getItem('tower-font'), 10); if (f >= 0 && f < FONTS.length) fontIdx = f; } catch (e) {}
@@ -235,7 +268,7 @@ try { vibOn = localStorage.getItem('tower-vib') !== '0'; } catch (e) {}
 function setVib(v) { vibOn = v; try { localStorage.setItem('tower-vib', v ? '1' : '0'); } catch (e) {} }
 const vib = p => { if (vibOn && navigator.vibrate) { try { navigator.vibrate(p); } catch (e) {} } };
 function setMuted(m) {
-  muted = m;
+  muted = m; if (m) stopAmbience();
   try { localStorage.setItem('tower-mute', m ? '1' : '0'); } catch (e) {}
   $('mute').innerHTML = ico(m ? 'mute' : 'sound');
 }
@@ -385,7 +418,7 @@ function newFloor() {
     return { type, done: false, hint: hintFor(type) };
   });
   S.lift = { state: chance(0.15) ? 'ok' : 'broken', cost: repairCost() };
-  log(`Этаж <b>${S.floor}</b>. Три двери и ${S.lift.state === 'ok' ? 'исправный лифт' : 'лифт с разбитой кабиной'}.`);
+  log(`Этаж <b>${S.floor}</b>. Три двери и ${S.lift.state === 'ok' ? 'исправный лифт' : 'лифт, который дальше не идёт'}.`);
   checkQuest();
   render(); save();
 }
@@ -494,9 +527,9 @@ function climbRope() {
   if (!spendEnergy(4)) return;
   if (chance(0.35)) {
     const d = rnd(3, 6) + Math.floor(S.floor / 10);
-    S.hp -= d; log(`Ты срываешься с троса: -${d} здоровья.`, 'bad'); sfx('hurt'); vib(60);
+    S.hp -= d; log(`Ты оступаешься на обломках лестницы: -${d} здоровья.`, 'bad'); sfx('hurt'); vib(60);
     if (checkDeath()) return;
-  } else log('Ты лезешь по тросу, обдирая ладони.');
+  } else log('Ты пробираешься наверх по заваленной лестнице.');
   ascend();
 }
 
@@ -1098,14 +1131,14 @@ function renderDock() {
     r.appendChild(dk('⭐', 'Навыки', go('skills'), { cls: S.sp ? 'primary' : '', badge: S.sp || '' }));
     r.appendChild(dk('📖', 'Дневник', go('diary')));
     r.appendChild(dk('🏆', 'Награды', go('ach')));
-    if (S.lift && S.lift.state === 'ok' && S.floor >= 3) r.appendChild(dk('🏠', 'Убежище', goBase));
+    if (S.lift && S.lift.state === 'ok' && S.floor >= 3) r.appendChild(dk('🏠', 'Убежище', () => liftTrip(goBase)));
     r.appendChild(dk('❓', 'Справка', () => { S.helpFrom = 'map'; S.screen = 'help'; render(); }));
   } else {
     r.appendChild(dk('🛏', 'Спать', sleep, { cls: 'primary', disabled: S.en < 6 }));
     r.appendChild(dk('🍳', 'Кухня', go('kitchen')));
     r.appendChild(dk('🛠', 'Верстак', go('craft')));
     r.appendChild(dk('⭐', 'Навыки', go('skills'), { cls: S.sp ? 'primary' : '', badge: S.sp || '' }));
-    r.appendChild(dk('⬆', 'Наверх', returnUp, { cls: 'primary' }));
+    r.appendChild(dk('⬆', 'Наверх', () => liftTrip(returnUp), { cls: 'primary' }));
   }
   d.appendChild(r);
 }
@@ -1232,9 +1265,9 @@ function render() {
       break;
     }
     case 'liftmenu':
-      head(a, 'Кабина разбита и стоит между этажами. Лифт можно починить материалами или обойти по тросу.');
+      head(a, 'Кабина разбита и стоит между этажами. Лифт можно починить материалами или подняться по лестнице — она завалена обломками.');
       a.appendChild(btn(`🛠 Починить лифт — ${costText(S.lift.cost)}`, repairLift, 'full primary', !canPay(S.lift.cost)));
-      a.appendChild(btn('🪢 Лезть по тросу (-4 энергии, риск травмы)', climbRope, 'full'));
+      a.appendChild(btn('Подняться по лестнице через завалы (-4 энергии, риск травмы)', () => { S.screen = 'map'; render(); climbAnim(climbRope); }, 'full'));
       a.appendChild(btn('← Назад', () => { S.screen = 'map'; render(); }, 'full'));
       break;
     case 'start': {

@@ -66,6 +66,9 @@ HUMAN.crawler = {
   walk: t => { const a = t * PI * 2 / 1.3, s = Math.sin(a); return Object.assign({}, HZ, { torso: -1.42 + .05 * s, head: 1.15 + .08 * s, uarmN: 2.1 + .45 * s, farmN: -.3 - .4 * Math.max(0, Math.cos(a)), handN: .6, uarmF: 2.3 - .45 * s, farmF: -.3 - .4 * Math.max(0, -Math.cos(a)), handF: .6, thighN: -1.45 + .1 * s, thighF: -1.55 - .1 * s, bx: 1.5 * s }); },
   attack: { dur: .7, k: [[.3, { head: 1.4, uarmN: 1.6, uarmF: 1.8 }], [.45, { head: .8, uarmN: 2.9, uarmF: 2.8, torso: -1.3 }]] },
 };
+// обыск: присесть на корточки и пошарить рукой
+const SEARCH = { dur: 1, k: [[.22, { thighN: 1.05, shinN: -1.9, footN: .85, thighF: .55, shinF: -1.75, footF: 1.2, torso: -.42, head: -.35, uarmN: 1.1, farmN: .5, uarmF: .7, farmF: .6, by: -18 }],
+  [.45, { uarmN: .8, farmN: .9 }], [.65, { uarmN: 1.15, farmN: .35 }], [.82, { uarmN: .9, farmN: .8, head: -.2 }]] };
 const HIT = { dur: .38, k: [[.18, { torso: .32, head: .35, uarmF: .7, farmF: 1.2, bx: -3 }]] };
 const DEATH = { dur: 1.3, k: [[.35, { thighN: .9, shinN: -1.5, footN: .6, thighF: .7, shinF: -1.3, footF: .6, torso: -.35, head: -.3, by: -12, uarmN: .2, uarmF: .1 }], [.8, { rot: 1.48, by: 8, bx: -8, thighN: .3, shinN: -.3, footN: 0, thighF: .2, shinF: -.2, footF: 0, torso: .1, head: .5, uarmN: 2.2, farmN: .4, uarmF: -.6, farmF: .3 }], [.92, { rot: 1.52, by: 9 }]] };
 const DEATH_CRAWL = { dur: 1, k: [[.6, { head: .2, torso: -1.52, uarmN: 1.7, uarmF: 2.8, by: -2 }]] };
@@ -137,7 +140,7 @@ export function buildHuman2D(cfg, wi) {
   };
   const main = assemble(false), shade = assemble(true);
   const style = cfg.style && HUMAN[cfg.style] ? cfg.style : cfg.zombie ? 'zombie' : 'hero';
-  const lib = Object.assign({}, HUMAN[style], { hit: HIT, death: style === 'crawler' ? DEATH_CRAWL : DEATH });
+  const lib = Object.assign({}, HUMAN[style], { hit: HIT, search: SEARCH, death: style === 'crawler' ? DEATH_CRAWL : DEATH });
   const ctl = controller(lib);
   const put = (J, p) => {
     J.body.position.set(p.bx, p.by, 0); J.body.rotation.z = p.rot;
