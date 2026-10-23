@@ -24,8 +24,10 @@ const G = (parent, x = 0, y = 0) => { const g = new THREE.Group(); g.position.se
 // ---------- ключевые кадры ----------
 const sm = t => t * t * (3 - 2 * t);
 function lerpPose(a, b, t) { const o = {}; for (const k in a) o[k] = a[k] + ((b[k] == null ? a[k] : b[k]) - a[k]) * t; return o; }
+// промежуточные ключи наследуют значения предыдущих; в конце — возврат к базовой позе (или удержание последней)
 function keys(p, base, list, hold) {
-  const ks = [[0, {}], ...list, [1, hold ? list[list.length - 1][1] : {}]];
+  let acc = {}; const mid = list.map(([t, k]) => { acc = Object.assign({}, acc, k); return [t, acc]; });
+  const ks = [[0, {}], ...mid, [1, hold ? acc : {}]];
   let i = 0; while (i < ks.length - 2 && p > ks[i + 1][0]) i++;
   const [p0, A] = ks[i], [p1, B] = ks[i + 1], t = sm(Math.min(1, Math.max(0, (p - p0) / (p1 - p0 || 1))));
   return lerpPose(Object.assign({}, base, A), Object.assign({}, base, B), t);
