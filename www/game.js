@@ -386,9 +386,10 @@ function log(text, cls = '') {
   el.appendChild(p);
   while (el.children.length > 60) el.removeChild(el.firstChild);
   el.scrollTop = el.scrollHeight;
-  el.classList.add('fresh'); clearTimeout(logTimer); logTimer = setTimeout(() => el.classList.remove('fresh'), 5200);
   if ($('radio')) $('radio').classList.add('new');
-  if (cls === 'good' || (cls === 'bad' && S && S.screen !== 'fight')) toast(text.replace(/<[^>]+>/g, ''), cls);
+  // важное — всплывающей плашкой по центру, остальное — строкой у радио
+  if (cls === 'good' || (cls === 'bad' && S && S.screen !== 'fight')) { el.classList.remove('fresh'); toast(text.replace(/<[^>]+>/g, ''), cls); }
+  else { el.classList.add('fresh'); clearTimeout(logTimer); logTimer = setTimeout(() => el.classList.remove('fresh'), 5200); }
 }
 let toastTimer = 0;
 function toast(text, cls) {
@@ -1061,7 +1062,7 @@ function pickEnding() {
 }
 function checkDeath() {
   if (S.hp > 0) return false;
-  S.hp = 0; S.over = true; S.screen = 'dead'; sfx('death'); vib([100, 60, 200]);
+  S.hp = 0; S.over = true; S.screen = 'dead'; S.killer = S.enemy ? S.enemy.n : null; sfx('death'); vib([100, 60, 200]);
   best = Math.max(best, S.floor);
   meta.bestFloor = Math.max(meta.bestFloor || 0, S.floor); saveMeta();
   log(`Ты погиб на этаже ${S.floor}.`, 'bad');
@@ -1071,7 +1072,7 @@ function checkDeath() {
 function win() {
   S.over = true; S.screen = 'win'; best = TOP; meta.bestFloor = TOP;
   meta.wins++; if (S.cycle >= 1) meta.ngWins++; if (S.diff === 2) meta.hardWins = (meta.hardWins || 0) + 1; saveMeta(); sfx('win'); vib([60, 40, 60, 40, 200]);
-  const end = pickEnding(); meta.endings[end.id] = true; saveMeta();
+  const end = pickEnding(); meta.endings[end.id] = true; S.endId = end.id; saveMeta();
   log('<b>Сотый этаж. Ты выходишь на крышу и впервые за долгое время видишь небо.</b>', 'good');
   log(`Концовка «${end.n}» (${Object.keys(meta.endings).length}/4): ${end.t}`, 'story');
   log(statsLine(), 'story');
@@ -1156,9 +1157,9 @@ function openAim() {
   });
   $('aim').classList.add('open');
 }
-function illust(kind) {
+function illust(kind, extra) {
   const c = document.createElement('canvas'); c.className = 'ill'; c.width = 480; c.height = 400;
-  if (window.GL3D && GL3D.drawScene) GL3D.drawScene(c, kind);
+  if (window.GL3D && GL3D.drawScene) GL3D.drawScene(c, kind, extra);
   return c;
 }
 function closeAim() { $('aim').classList.remove('open'); }
@@ -1175,7 +1176,7 @@ function layoutUI() {
   } else $('sheet-title').textContent = perk ? 'Новый уровень!' : (SHEET_TITLES[sc] || '');
   $('sheet').classList.toggle('tabbed', !perk && tabs.includes(sc));
   if (sc !== 'fight') closeAim();
-  $('actions').className = perk ? '' : sc === 'inv' ? 'inv-l' : ['event', 'trader', 'vending', 'locked', 'start'].includes(sc) ? 'ill-l' : '';
+  $('actions').className = perk ? '' : sc === 'inv' ? 'inv-l' : ['event', 'trader', 'vending', 'locked', 'start', 'dead', 'win'].includes(sc) ? 'ill-l' : '';
   $('dock').style.display = sheet ? 'none' : '';
   $('btn-hl').classList.toggle('on', $('sv').classList.contains('hl'));
   $('btn-fast').classList.toggle('on', walkMs < 400);
@@ -1407,6 +1408,8 @@ function render() {
       break;
     case 'fight': break;
     default:
+      if (S.screen === 'dead' || S.screen === 'win') a.appendChild(illust(S.screen, S.screen === 'dead' ? { killer: S.killer, wi: S.wi, ai: S.ai } : { end: S.endId, wi: S.wi, ai: S.ai }));
+      if (S.screen === 'win' && S.endId && ENDINGS[S.endId]) head(a, `Концовка «${ENDINGS[S.endId].n}». ${ENDINGS[S.endId].t}`);
       head(a, statsLine());
       if (S.screen === 'win') a.appendChild(btn(`Новая игра+ (круг ${S.cycle + 2}, герой сохраняется)`, newGamePlus, 'full primary'));
       a.appendChild(btn(S.screen === 'win' ? 'Новая игра с нуля' : 'Начать заново', newGame, 'full' + (S.screen === 'win' ? '' : ' primary')));

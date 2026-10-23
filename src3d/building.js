@@ -52,6 +52,7 @@ function lightCone(c, x, y, H, col = 'rgba(255,230,180,') { const g = c.createLi
 // ---------- комната ----------
 // type: тип комнаты из игры (определяет особые предметы), zone: z0..z4/base
 function roomTexture(W, H, zone, type, sd, opts = {}) {
+  const lv = opts.levels || {};
   const th = THEMES[zone] || THEMES.z1;
   return canvas(W, H, c => {
     seed(sd);
@@ -64,7 +65,9 @@ function roomTexture(W, H, zone, type, sd, opts = {}) {
     // мебель по зоне (2–3 предмета без наложений)
     const list = ZONE_PROPS[zone] || ZONE_PROPS.z1;
     const special = { loot: ['crates', 'boxes'], rest: ['bed'], vending: [], trader: ['table'], event: ['table'], enemy: [], trap: [], empty: [], locked: ['crates', 'shelves'],
-      bedroom: ['bed', 'cabinet'], kitchen: ['fridge', 'stove', 'table'], workshop: ['workbench', 'shelves'] }[type] || [];
+      // убежище обрастает вещами по мере улучшений кухни и верстака
+      bedroom: ['bed', 'cabinet', 'armchair'], kitchen: ['fridge', 'stove'].concat(lv.kitchen >= 2 ? ['table'] : [], lv.kitchen >= 3 ? ['cooler', 'shelves'] : []),
+      workshop: ['workbench'].concat(lv.bench >= 2 ? ['shelves'] : [], lv.bench >= 3 ? ['crates'] : []) }[type] || [];
     let x = 8 + rnd() * 10; const want = zone === 'base' ? 0 : (opts.sparse ? 2 : 3) - Math.min(1, special.length);
     const items = special.concat(Array.from({ length: want }, () => list[(rnd() * list.length) | 0]));
     items.forEach(n => { if (x > W - 30) return; const f = PROPS[n]; if (!f) return; const w = f(c, x, FL); x += w + 10 + rnd() * 16; });
@@ -125,7 +128,7 @@ export function buildBuilding(o, L) {
     const W = cp.x1 - cp.x0, sd = o.floor * 31 + ci * 7 + (o.base ? 999 : 0);
     let tex;
     if (cp.k === 'hall') tex = hallTexture(W, H, o.base ? 'base' : zone, o.floor, sd);
-    else tex = roomTexture(W, H, o.base ? 'base' : zone, o.base ? ({ 0: 'bedroom', 1: 'kitchen', 3: 'workshop' })[ci] : (o.rooms[cp.i] || {}).type, sd);
+    else tex = roomTexture(W, H, o.base ? 'base' : zone, o.base ? ({ 0: 'bedroom', 1: 'kitchen', 3: 'workshop' })[ci] : (o.rooms[cp.i] || {}).type, sd, { levels: o.levels });
     const mat = basic(tex); mats.push(mat);
     const p = plane(W, H, mat, (cp.x0 + cp.x1) / 2, yc(FY - H / 2), -10);
     const dark = cp.k === 'room' && !o.base ? plane(W, H, new THREE.MeshBasicMaterial({ color: 0x030304, transparent: true, opacity: .96, depthWrite: false }), (cp.x0 + cp.x1) / 2, yc(FY - H / 2), -6) : null;

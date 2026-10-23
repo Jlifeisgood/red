@@ -185,7 +185,7 @@ GL.update = (o) => {
   if (o.floorKey !== bldKey) {
     bldKey = o.floorKey;
     if (bld) { scene.remove(bld.root); bld.dispose(); bld = null; }
-    try { bld = buildBuilding({ zone: o.zone, floor: o.floor, base: o.base, rooms: o.rooms }, o.layout); scene.add(bld.root); } catch (e) { console.error(e); bld = null; }
+    try { bld = buildBuilding({ zone: o.zone, floor: o.floor, base: o.base, rooms: o.rooms, levels: o.levels }, o.layout); scene.add(bld.root); } catch (e) { console.error(e); bld = null; }
     // поездка на лифте: новый этаж въезжает сверху (подъём) или снизу (спуск в убежище), будто камера едет вместе с кабиной
     blood.length = 0; dying.forEach(disposeHolder); dying = [];
     if (bld && o.slide) { const d = o.layout.roomH + o.layout.slab; slide = { t0: performance.now(), dur: 1050, from: o.slide === 'up' ? d : -d }; bld.root.position.y = slide.from; } else slide = null;
@@ -277,17 +277,17 @@ function drawModel(ctx, m, s, ox, oy, region, dim) {
   m.group.updateMatrixWorld(true);
   const list = []; m.group.traverse(o => { if (o.isMesh && o.material.map && !o.material.userData.glow) list.push(o); });
   list.sort((a, b) => a.renderOrder - b.renderOrder);
-  const hl = region ? new Set(REGION[region] || []) : null;
+  const hl = region ? new Set(REGION[region] || []) : null, base = ctx.getTransform();   // текущее преобразование холста (например, зеркало) сохраняется
   for (const o of list) {
     const e = o.matrixWorld.elements, img = o.material.map.image, w = o.geometry.parameters.width, h = o.geometry.parameters.height;
-    ctx.setTransform(s * e[0], -s * e[1], -s * e[4], s * e[5], s * e[12] + ox, -s * e[13] + oy);
+    ctx.setTransform(base.multiply(new DOMMatrix([s * e[0], -s * e[1], -s * e[4], s * e[5], s * e[12] + ox, -s * e[13] + oy])));
     if (hl && hl.has(o.userData.part)) {
       const tc = document.createElement('canvas'); tc.width = img.width; tc.height = img.height; const tx = tc.getContext('2d');
       tx.drawImage(img, 0, 0); tx.globalCompositeOperation = 'source-atop'; tx.fillStyle = 'rgba(214,28,20,.82)'; tx.fillRect(0, 0, tc.width, tc.height);
       ctx.drawImage(tc, -w / 2, -h / 2, w, h);
     } else { ctx.globalAlpha = dim && hl ? .9 : 1; ctx.drawImage(img, -w / 2, -h / 2, w, h); ctx.globalAlpha = 1; }
   }
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.setTransform(base);
 }
 // Рисует героя/врага в холст cv: mode 'portrait' (голова крупно) или 'full' (весь рост, подсветка region)
 GL.drawChar = (cv, who, mode, region) => {
@@ -312,10 +312,42 @@ GL.drawChar = (cv, who, mode, region) => {
   return true;
 };
 // иллюстрация к окну события, торговца, автомата или запертой двери (как сценки в Skyhill): комната с окном в грозу и герой сцены
-GL.drawScene = (cv, kind) => {
+// разовая поза персонажа для иллюстраций: проиграть анимацию anim до момента t
+function posed(m, anim, t) { if (anim && anim !== 'idle') m.ctl.once(anim); for (let k = 0; k < t; k += 1 / 30) m.apply(m.ctl.pose(1 / 30)); m.group.scale.setScalar(1); return m; }
+function freeModel(m) { [m.group, m.shadow].forEach(g => g && g.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); })); }
+// фигура в пикселях холста (x, y — точка у ног); flip — смотрит влево; tint — затемнение силуэта
+function drawFig(ctx, m, s, x, y, flip, alpha = 1, tint) {
+  const c = document.createElement('canvas'); c.width = ctx.canvas.width; c.height = ctx.canvas.height; const x2 = c.getContext('2d');
+  if (flip) { x2.translate(2 * x, 0); x2.scale(-1, 1); }
+  drawModel(x2, m, s, x, y);
+  if (tint) { x2.setTransform(1, 0, 0, 1, 0, 0); x2.globalCompositeOperation = 'source-atop'; x2.fillStyle = tint; x2.fillRect(0, 0, c.width, c.height); }
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = alpha; ctx.drawImage(c, 0, 0); ctx.restore();
+}
+// иллюстрация к окну (как сценки в Skyhill): kind — npc | vending | locked | box | dead | win; extra — убийца или концовка
+GL.drawScene = (cv, kind, extra) => {
   const ctx = cv.getContext('2d'), W = cv.width, H = cv.height, s = H / 300, wu = W / s, FL = 272;
   ctx.setTransform(s, 0, 0, s, 0, 0);
-  let g = ctx.createLinearGradient(0, 0, 0, 300); g.addColorStop(0, '#24252b'); g.addColorStop(1, '#17181c'); ctx.fillStyle = g; ctx.fillRect(0, 0, wu, 300);
+  let g;
+  if (kind === 'win') {
+    // крыша на рассвете
+    g = ctx.createLinearGradient(0, 0, 0, 300); g.addColorStop(0, '#1d2440'); g.addColorStop(.45, '#7a4a5a'); g.addColorStop(.75, '#e09a5a'); g.addColorStop(1, '#f2c27a'); ctx.fillStyle = g; ctx.fillRect(0, 0, wu, 300);
+    ctx.fillStyle = 'rgba(255,236,190,.9)'; ctx.beginPath(); ctx.arc(wu * .72, 228, 34, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(255,220,170,.25)'; ctx.beginPath(); ctx.arc(wu * .72, 228, 60, 0, 7); ctx.fill();
+    ctx.fillStyle = '#2a2230'; let x = 0; ctx.beginPath(); ctx.moveTo(0, 260); while (x < wu) { const h = 20 + ((x * 37) % 53); ctx.lineTo(x, 260 - h); x += 14 + (x * 13) % 19; ctx.lineTo(x, 260 - h); } ctx.lineTo(wu, 300); ctx.lineTo(0, 300); ctx.fill();
+    ctx.fillStyle = '#121014'; ctx.fillRect(0, FL - 6, wu, 40); ctx.fillRect(wu * .05, FL - 46, 30, 40); ctx.fillRect(wu * .05 + 6, FL - 70, 4, 24);
+    ctx.strokeStyle = '#121014'; ctx.lineWidth = 2; for (let i = 0; i < 12; i++) { ctx.beginPath(); ctx.moveTo(i * wu / 11, FL - 6); ctx.lineTo(i * wu / 11, FL - 22); ctx.stroke(); } ctx.fillRect(0, FL - 23, wu, 2);
+    const hero = posed(heroModel(extra && extra.wi || 0, extra && extra.ai || 0), 'idle', .5);
+    const end = extra && extra.end;
+    if (end === 'light') {                                  // сигнальный огонь и спасённые
+      ctx.fillStyle = '#3a2a1a'; ctx.fillRect(wu * .5 - 14, FL - 12, 28, 6);
+      for (let i = 0; i < 4; i++) { ctx.fillStyle = ['#ffd36b', '#ff9a3a', '#ff5a2a', '#fff2b0'][i]; ctx.beginPath(); ctx.moveTo(wu * .5 - 12 + i * 2, FL - 12); ctx.quadraticCurveTo(wu * .5 - 6 + i * 3, FL - 40 - i * 8, wu * .5 + 2 - i, FL - 60 + i * 10); ctx.quadraticCurveTo(wu * .5 + 8, FL - 30, wu * .5 + 12 - i * 2, FL - 12); ctx.fill(); }
+      const npc = posed(npcModel('trader'), 'idle', .9); drawFig(ctx, npc, s * 1.45, W * .64, (FL - 6) * s, true, 1, 'rgba(20,14,18,.55)'); freeModel(npc);
+    }
+    if (end === 'scribe') { ctx.fillStyle = '#efe6d0'; for (let i = 0; i < 9; i++) { ctx.save(); ctx.translate(wu * (.45 + i * .06), 60 + (i * 47) % 120); ctx.rotate(i * .7); ctx.fillRect(-6, -8, 12, 16); ctx.restore(); } }
+    drawFig(ctx, hero, s * 1.45, W * .3, (FL - 6) * s, false, 1, 'rgba(20,14,18,.55)'); freeModel(hero);
+    ctx.setTransform(1, 0, 0, 1, 0, 0); return;
+  }
+  g = ctx.createLinearGradient(0, 0, 0, 300); g.addColorStop(0, '#24252b'); g.addColorStop(1, '#17181c'); ctx.fillStyle = g; ctx.fillRect(0, 0, wu, 300);
   ctx.fillStyle = 'rgba(255,255,255,.025)'; for (let x = 0; x < wu; x += 16) ctx.fillRect(x, 0, 8, FL);
   ctx.save(); ctx.translate(wu * .66, 108); ctx.scale(2.1, 2.1); DECO.window(ctx, 0, 0); ctx.restore();
   ctx.fillStyle = '#121214'; ctx.fillRect(0, FL, wu, 300 - FL); ctx.fillStyle = 'rgba(255,255,255,.06)'; ctx.fillRect(0, FL, wu, 1.5);
@@ -323,10 +355,19 @@ GL.drawScene = (cv, kind) => {
   if (kind === 'vending') { ctx.save(); ctx.translate(wu * .32, FL); ctx.scale(2.6, 2.6); PROPS.vending(ctx, -20, 0); ctx.restore(); }
   if (kind === 'locked') { ctx.save(); ctx.translate(wu * .32, FL); ctx.scale(2.2, 2.2); PROPS.door(ctx, -25, 0); ctx.restore(); }
   if (kind === 'box') { ctx.save(); ctx.translate(wu * .3, FL); ctx.scale(1.8, 1.8); PROPS.crates(ctx, -32, 0); ctx.restore(); PROPS.radiator(ctx, wu * .7, FL); }
-  if (kind === 'npc') {
-    const m = npcModel('trader'); m.apply(m.ctl.pose(.8)); m.group.scale.setScalar(1);
-    drawModel(ctx, m, s * 1.85, W * .3, FL * s);
-    m.group.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+  if (kind === 'npc') { const m = posed(npcModel('trader'), 'idle', .8); drawFig(ctx, m, s * 1.85, W * .3, FL * s); freeModel(m); }
+  if (kind === 'dead') {
+    // герой лежит в луже крови, над ним — тот, кто его убил
+    ctx.fillStyle = 'rgba(80,4,3,.9)'; ctx.beginPath(); ctx.ellipse(wu * .42, FL + 3, 80, 7, 0, 0, 7); ctx.fill();
+    const hero = posed(heroModel(extra && extra.wi || 0, extra && extra.ai || 0), 'death', 2);
+    drawFig(ctx, hero, s * 1.35, W * .64, FL * s, false); freeModel(hero);
+    if (extra && extra.killer) {
+      const k = posed(enemyModel(extra.killer), 'idle', 1.1); const q = k.kind === 'quad';
+      drawFig(ctx, k, s * (q ? 2.3 : 1.55) * (k.cfg.scale || 1), W * (q ? .8 : .84), FL * s, true, 1, 'rgba(8,6,8,.5)'); freeModel(k);
+    }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    g = ctx.createRadialGradient(W * .45, H * .5, H * .15, W * .5, H * .5, W * .7); g.addColorStop(0, 'rgba(60,0,0,0)'); g.addColorStop(1, 'rgba(60,0,0,.75)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    return;
   }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   g = ctx.createRadialGradient(W * .45, H * .45, H * .2, W * .5, H * .5, W * .75); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,.7)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);

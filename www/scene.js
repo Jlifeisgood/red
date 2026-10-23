@@ -85,6 +85,20 @@ function svgBuilding(inBase, zone) {
   return s;
 }
 
+// ---------- заставки: номер этажа, вход в новую зону, сон ----------
+let cardT = 0;
+function showCard(big, small, text) {
+  const c = $('card'); if (!c) return;
+  c.querySelector('b').textContent = big; c.querySelector('small').textContent = small; c.querySelector('p').textContent = text || '';
+  c.className = 'show' + (text ? ' zone' : '');
+  clearTimeout(cardT); cardT = setTimeout(() => { c.className = ''; }, text ? 3600 : 1900);
+}
+function fadeThen(caption, fn, hold = 900) {
+  const f = $('fade'); f.querySelector('span').textContent = caption; f.className = 'on'; sceneBusy = true;
+  setTimeout(() => { fn(); f.className = 'on cap'; }, 700);
+  setTimeout(() => { f.className = ''; sceneBusy = false; }, 700 + hold + 500);
+}
+
 // ---------- перемещение героя ----------
 function setHero(x, walk, instant) {
   const h = $('hero');
@@ -152,7 +166,7 @@ function sceneTap(i) {
   } else if (S.screen === 'base' && S.inBase) {
     if (i === 'lift') return liftTrip(returnUp);
     const c = COMPS[BASE_COMP[i]]; if (!c) return;
-    if (i === 'f0') return walkThen(entryX(c), sleep);
+    if (i === 'f0') return walkThen(entryX(c), () => { if (S.en < 6) return sleep(); fadeThen('Прошло несколько часов…', sleep, 1100); });
     if (i === 'f1') return walkThen(entryX(c), () => { S.screen = 'kitchen'; render(); });
     if (i === 'f2') return walkThen(entryX(c), () => { S.screen = 'craft'; render(); });
   }
@@ -210,6 +224,11 @@ function renderScene() {
     const pf = prevFloor; prevFloor = { floor: S.floor, base: inBase };
     pendingSlide = !pf ? null : pf.base !== inBase && pf.floor === S.floor ? (inBase ? 'down' : 'up') : !inBase && !pf.base && S.floor - pf.floor === 1 ? 'up' : null;
     const wait = pendingSlide ? 1050 : 0, stairs = arriveBy === 'stairs' && !inBase; arriveBy = 'lift';
+    if (inBase) showCard('Убежище', 'под этажом ' + S.floor);
+    else if (!pf || pf.floor !== S.floor) {
+      const newZone = (S.floor - 1) % 20 === 0 && S.floor > 1;
+      showCard(String(S.floor), ZONES[zone].name, newZone ? ZONES[zone].intro : '');
+    }
     introT.forEach(clearTimeout);
     if (stairs) {                                         // пришёл по лестнице: выходит из лестничного проёма
       heroX = HALL.x0 + 22; setHero(HALL.x0 + 22, false, true); $('hero').classList.add('boarding'); liftOpen = false;
@@ -277,7 +296,7 @@ function renderScene() {
   let npc = null, npcX = 0, npcDir = -1;
   if (!inBase) S.rooms.forEach((r, i) => { if (r && r.type === 'trader' && r.done && !npc) { const cc = COMPS[roomComp(i)]; npc = 'trader'; npcX = leftOfHall(cc) ? cc.x0 + 70 : cc.x1 - 70; npcDir = leftOfHall(cc) ? 1 : -1; } });
   if (window.GL3D) GL3D.update({
-    visible: true, layout: LAYOUT, floorKey: (inBase ? 'base' : 'z' + zone) + ':' + S.floor + ':' + (inBase ? '' : S.rooms.map(r => r && r.type).join(',')),
+    visible: true, layout: LAYOUT, floorKey: (inBase ? 'base' : 'z' + zone) + ':' + S.floor + ':' + (inBase ? S.kitchen + '/' + S.bench : S.rooms.map(r => r && r.type).join(',')), levels: { kitchen: S.kitchen, bench: S.bench },
     zone: 'z' + zone, floor: S.floor, base: inBase, rooms: S.rooms, heroComp: curComp, revealing, liftOk: ok, liftOpen,
     wi: S.wi, ai: S.ai, enemy: fight ? S.enemy.n : null, foeX: FIGHT.fx, foeY: FOE_Y, foeDir: -FIGHT.dir, heroDir: FIGHT.dir, fight, dead: S.screen === 'dead',
     npc: fight ? null : npc, npcX, npcDir, slide: pendingSlide,
