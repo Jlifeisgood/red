@@ -1123,6 +1123,11 @@ function openAim() {
   });
   $('aim').classList.add('open');
 }
+function illust(kind) {
+  const c = document.createElement('canvas'); c.className = 'ill'; c.width = 480; c.height = 400;
+  if (window.GL3D && GL3D.drawScene) GL3D.drawScene(c, kind);
+  return c;
+}
 function closeAim() { $('aim').classList.remove('open'); }
 function layoutUI() {
   const sc = S.screen, perk = sc === 'map' && S.pendingPerks > 0;
@@ -1137,7 +1142,7 @@ function layoutUI() {
   } else $('sheet-title').textContent = perk ? 'Новый уровень!' : (SHEET_TITLES[sc] || '');
   $('sheet').classList.toggle('tabbed', !perk && tabs.includes(sc));
   if (sc !== 'fight') closeAim();
-  $('actions').className = sc === 'inv' && !perk ? 'inv-l' : '';
+  $('actions').className = perk ? '' : sc === 'inv' ? 'inv-l' : ['event', 'trader', 'vending', 'locked', 'start'].includes(sc) ? 'ill-l' : '';
   $('dock').style.display = sheet ? 'none' : '';
   $('btn-hl').classList.toggle('on', $('sv').classList.contains('hl'));
   $('btn-fast').classList.toggle('on', walkMs < 400);
@@ -1335,22 +1340,26 @@ function render() {
       break;
     }
     case 'locked':
+      a.appendChild(illust('locked'));
       head(a, `Запертая дверь. Ключей: ${S.keys}🔑.`);
       a.appendChild(btn('💪 Выбить дверь (-3 энергии, шанс 50%, при неудаче ушиб)', forceDoor, 'full primary'));
       a.appendChild(btn('Уйти', () => { S.screen = 'map'; render(); }, 'full'));
       break;
     case 'vending':
+      a.appendChild(illust('vending'));
       head(a, `Автомат. У тебя 🔩${S.scrap}`);
       S.vend.stock.forEach((g, i) => a.appendChild(btn(g.sold ? `${g.n} — продано` : `${g.n} — ${g.cost}🔩`, () => buyVend(i), '', g.sold || S.scrap < g.cost)));
       a.appendChild(btn('Ударить автомат', kickVend, 'full danger', S.vend.kicked));
       a.appendChild(btn('Уйти', () => { S.screen = 'map'; render(); }, 'full primary'));
       break;
     case 'trader':
-      head(a, `У тебя 🔩${S.scrap}`);
+      a.appendChild(illust('npc'));
+      head(a, `«Лом есть — товар есть». У тебя 🔩${S.scrap}`);
       GOODS.forEach((g, i) => a.appendChild(btn(`${g.n} — ${g.cost}🔩`, () => buy(i), '', S.scrap < g.cost)));
       a.appendChild(btn('Уйти', () => { S.screen = 'map'; render(); }, 'full primary'));
       break;
     case 'event':
+      a.appendChild(illust(/ранен|человек|женщин|старик|мужчин|девоч|мальч|ребён|выживш|сосед|кто-то|незнаком|врач|солдат|голос/i.test(S.event.text) ? 'npc' : 'box'));
       head(a, S.event.text);
       S.event.choices.forEach((c, i) => a.appendChild(btn(c.l, () => eventChoice(i), 'full', c.ok ? !c.ok() : false)));
       break;

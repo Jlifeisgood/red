@@ -105,6 +105,14 @@ export const PROPS = {
   fridge(c, x, FL) { const w = 38; block(c, x, FL - 96, w, 96, '#d8dad6'); ln(c, [x + 2, FL - 62, x + w - 2, FL - 62], '#9a9c98', 1); R(c, x + w - 8, FL - 86, 2.4, 16, '#8a8c88'); R(c, x + w - 8, FL - 54, 2.4, 22, '#8a8c88'); return w; },
   workbench(c, x, FL) { const w = 92; R(c, x, FL - 40, w, 6, '#8a6a44'); legs(c, x + 2, w - 4, FL, 34, '#5a4328'); R(c, x + 4, FL - 14, w - 8, 3, '#5a4328'); block(c, x + 56, FL - 54, 18, 14, '#3a4252'); R(c, x + 60, FL - 62, 8, 8, '#6f7a8f');
     block(c, x + 8, FL - 112, w - 16, 54, '#4a3d2c'); for (let i = 0; i < 4; i++) ln(c, [x + 18 + i * 16, FL - 104, x + 18 + i * 16, FL - 76], ['#9aa0a6', '#7a4a2a', '#c9a24a', '#aa3a2a'][i], 2.2); return w; },
+  vending(c, x, FL) {
+    const w = 40; block(c, x, FL - 76, 40, 76, '#c8ccd0'); R(c, x + 4, FL - 70, 22, 52, '#1a2228'); const cc = ['#c03a2a', '#3a7ac0', '#e0b03a', '#4aa05a'];
+    for (let r = 0; r < 4; r++) for (let i = 0; i < 3; i++) R(c, x + 6 + i * 7, FL - 66 + r * 12, 5, 8, cc[(r + i) % 4]);
+    ln(c, [x + 5, FL - 68, x + 20, FL - 40, x + 12, FL - 22], 'rgba(255,255,255,.5)', .5); R(c, x + 29, FL - 66, 7, 14, '#3a3e42'); R(c, x + 6, FL - 14, 20, 6, '#111'); return w;
+  },
+  door(c, x, FL) { const w = 50; block(c, x - 4, FL - 108, 58, 108, '#2a2420'); block(c, x, FL - 102, 50, 102, '#5a4636'); R(c, x + 6, FL - 94, 38, 36, '#4e3c2e'); R(c, x + 6, FL - 52, 38, 40, '#4e3c2e');
+    fillRR(c, x + 18, FL - 58, 14, 11, 2, '#c9a422'); c.strokeStyle = '#c9a422'; c.lineWidth = 2.2; c.beginPath(); c.arc(x + 25, FL - 58, 4.5, Math.PI, 0); c.stroke(); circ(c, x + 25, FL - 53, 1.4, '#3a2a06'); circ(c, x + 42, FL - 52, 2.4, '#b89a5a'); return w; },
+  radiator(c, x, FL) { const w = 46; for (let i = 0; i < 8; i++) fillRR(c, x + i * 5.6, FL - 40, 4.6, 30, 2, '#8a8e90', false); R(c, x, FL - 12, 46, 3, '#6a6e70'); return w; },
   toolrack(c, x, FL) { const w = 50; block(c, x, FL - 112, w, 50, '#6a5a44'); for (let i = 0; i < 4; i++) ln(c, [x + 8 + i * 11, FL - 104, x + 8 + i * 11, FL - 80], ['#9aa0a6', '#7a4a2a', '#9aa0a6', '#aa3a2a'][i], 2.2); return w; },
 };
 export const ZONE_PROPS = {

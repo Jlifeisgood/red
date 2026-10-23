@@ -3,6 +3,7 @@ import { buildBuilding } from './building.js';
 import { makePost } from './post.js';
 import * as THREE from 'three';
 import { buildHuman2D, buildQuad2D } from './rig2d.js';
+import { PROPS, DECO } from './props2d.js';
 
 const GL = { ready: false, enabled: true, active: false };
 try { GL.enabled = localStorage.getItem('tower-3d') !== '0'; } catch (e) {}
@@ -272,6 +273,26 @@ GL.drawChar = (cv, who, mode, region) => {
   m.group.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
   m.shadow.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
   return true;
+};
+// иллюстрация к окну события, торговца, автомата или запертой двери (как сценки в Skyhill): комната с окном в грозу и герой сцены
+GL.drawScene = (cv, kind) => {
+  const ctx = cv.getContext('2d'), W = cv.width, H = cv.height, s = H / 300, wu = W / s, FL = 272;
+  ctx.setTransform(s, 0, 0, s, 0, 0);
+  let g = ctx.createLinearGradient(0, 0, 0, 300); g.addColorStop(0, '#24252b'); g.addColorStop(1, '#17181c'); ctx.fillStyle = g; ctx.fillRect(0, 0, wu, 300);
+  ctx.fillStyle = 'rgba(255,255,255,.025)'; for (let x = 0; x < wu; x += 16) ctx.fillRect(x, 0, 8, FL);
+  ctx.save(); ctx.translate(wu * .66, 108); ctx.scale(2.1, 2.1); DECO.window(ctx, 0, 0); ctx.restore();
+  ctx.fillStyle = '#121214'; ctx.fillRect(0, FL, wu, 300 - FL); ctx.fillStyle = 'rgba(255,255,255,.06)'; ctx.fillRect(0, FL, wu, 1.5);
+  if (kind === 'npc') { PROPS.radiator(ctx, wu * .6, FL); PROPS.boxes(ctx, wu * .78, FL); }
+  if (kind === 'vending') { ctx.save(); ctx.translate(wu * .32, FL); ctx.scale(2.6, 2.6); PROPS.vending(ctx, -20, 0); ctx.restore(); }
+  if (kind === 'locked') { ctx.save(); ctx.translate(wu * .32, FL); ctx.scale(2.2, 2.2); PROPS.door(ctx, -25, 0); ctx.restore(); }
+  if (kind === 'box') { ctx.save(); ctx.translate(wu * .3, FL); ctx.scale(1.8, 1.8); PROPS.crates(ctx, -32, 0); ctx.restore(); PROPS.radiator(ctx, wu * .7, FL); }
+  if (kind === 'npc') {
+    const m = npcModel('trader'); m.apply(m.ctl.pose(.8)); m.group.scale.setScalar(1);
+    drawModel(ctx, m, s * 1.85, W * .3, FL * s);
+    m.group.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  g = ctx.createRadialGradient(W * .45, H * .45, H * .2, W * .5, H * .5, W * .75); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,.7)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
 };
 // значок оружия для панели боя: клинок/дубина горизонтально, без оружия — кулак героя
 GL.drawWeapon = (cv, wi) => {

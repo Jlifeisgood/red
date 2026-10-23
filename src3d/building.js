@@ -68,18 +68,13 @@ function roomTexture(W, H, zone, type, sd, opts = {}) {
     let x = 8 + rnd() * 10; const want = zone === 'base' ? 0 : (opts.sparse ? 2 : 3) - Math.min(1, special.length);
     const items = special.concat(Array.from({ length: want }, () => list[(rnd() * list.length) | 0]));
     items.forEach(n => { if (x > W - 30) return; const f = PROPS[n]; if (!f) return; const w = f(c, x, FL); x += w + 10 + rnd() * 16; });
-    if (type === 'vending') vending(c, W - 48, FL);
+    if (type === 'vending') PROPS.vending(c, W - 48, FL);
     if (type === 'trap') { c.fillStyle = '#0a0808'; c.beginPath(); c.moveTo(W * .45, FL + 2); c.lineTo(W * .5, FL - 4); c.lineTo(W * .62, FL - 2); c.lineTo(W * .68, FL + 2); c.fill(); ln(c, [10, FL - 8, W - 10, FL - 10], 'rgba(200,200,200,.6)', .5); DECO.biohaz(c, W - 30, 70); }
     if (type === 'event' || type === 'trader') { block(c, W * .55, FL - 44, 18, 12, '#3a3a2a'); circ(c, W * .55 + 13, FL - 38, 3, '#222'); ln(c, [W * .55 + 4, FL - 44, W * .55 + 1, FL - 54], '#555', .8); }
     if (type === 'enemy' || type === 'trap') { c.fillStyle = 'rgba(90,6,4,.7)'; c.beginPath(); c.ellipse(W * .5, FL - 1, 26, 3.4, 0, 0, 7); c.fill(); for (let i = 0; i < 3; i++) { const bx = 20 + rnd() * (W - 40), by = 60 + rnd() * 70; c.fillStyle = 'rgba(80,6,4,.6)'; c.beginPath(); c.ellipse(bx, by, 6 + rnd() * 8, 4 + rnd() * 5, rnd(), 0, 7); c.fill(); R(c, bx - 1, by, 1.6, 10 + rnd() * 20, 'rgba(80,6,4,.55)'); } }
     // потолочная лампа и её свет
     const ly = lampDraw(c, lx, th.lamp); lightCone(c, lx, ly, FL, th.lamp === 'panel' ? 'rgba(220,235,255,' : 'rgba(255,225,170,');
   });
-}
-function vending(c, x, FL) {
-  block(c, x, FL - 76, 40, 76, '#c8ccd0'); R(c, x + 4, FL - 70, 22, 52, '#1a2228'); const cc = ['#c03a2a', '#3a7ac0', '#e0b03a', '#4aa05a'];
-  for (let r = 0; r < 4; r++) for (let i = 0; i < 3; i++) R(c, x + 6 + i * 7, FL - 66 + r * 12, 5, 8, cc[(r + i) % 4]);
-  ln(c, [x + 5, FL - 68, x + 20, FL - 40, x + 12, FL - 22], 'rgba(255,255,255,.5)', .5); R(c, x + 29, FL - 66, 7, 14, '#3a3e42'); R(c, x + 6, FL - 14, 20, 6, '#111');
 }
 // ---------- лестничная клетка ----------
 function hallTexture(W, H, zone, floor, sd) {
