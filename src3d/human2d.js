@@ -6,7 +6,7 @@ export const H = { hipY: 68, shoulder: [.5, -41], neck: [1, -47], knee: 30, ankl
 
 // ---------- туловище ----------
 function torsoShape(w, fat, mus) {
-  const X = v => v * w, b = fat * 9, c = mus * 3;
+  const X = v => v * w, b = fat * 15, c = mus * 4;
   return path(`M ${X(-3.5)} -48 C ${X(-6)} -47.5 ${X(-9) - c * .3} -46 ${X(-10) - c * .5} -41 C ${X(-11.5) - c * .6} -34 ${X(-9.5)} -26 ${X(-8) - b * .2} -20 `
     + `C ${X(-7.2) - b * .3} -15 ${X(-9) - b * .3} -8 ${X(-9.8) - b * .2} -2 C ${X(-10.5)} 3 ${X(-7)} 6.5 ${X(-2)} 7 L ${X(4)} 6.5 `
     + `C ${X(8)} 5 ${X(10.5) + b * .4} 0 ${X(10) + b * .8} -6 C ${X(9.6) + b} -12 ${X(9.4) + b} -17 ${X(10) + b * .7} -23 `
@@ -264,9 +264,9 @@ export function drawWeapon(ctx, wi, part = 'all') {
 // ---------- сборка описаний ----------
 export function humanSpec(cfg) {
   const body = cfg.style === 'brute' ? 'brute' : cfg.style === 'bloater' ? 'fat' : cfg.style === 'thin' ? 'thin' : 'normal';
-  const w = { thin: .84, normal: 1, fat: 1.05, brute: 1.16 }[body], lw = { thin: .82, normal: 1, fat: 1.25, brute: 1.25 }[body];
+  const w = { thin: .84, normal: 1, fat: 1.1, brute: 1.28 }[body], lw = { thin: .82, normal: 1, fat: 1.35, brute: 1.3 }[body];
   const T = { w, fat: body === 'fat' ? 1 + (cfg.fat || 1) * .2 : 0, mus: body === 'brute' ? 1 : 0 };
-  const arm = (big) => big ? { U: { L: 28, a: 8.4, b: 7, fb: 3, bb: 2 }, F: { L: 25, a: 7.6, b: 6.6, fb: 2.6, bb: 1 }, hk: 1.6 }
+  const arm = (big) => big ? { U: { L: 29, a: 11, b: 9.5, fb: 4, bb: 3 }, F: { L: 27, a: 10, b: 12, fb: 3, bb: 2 }, hk: 2.1 }
     : { U: { L: 26, a: 5.2 * lw, b: 4.2 * lw, fb: 1.2 * lw, bb: .8 * lw }, F: { L: 23, a: 4.4 * lw, b: 3.2 * lw, fb: 1.4 * lw, bb: .4 * lw }, hk: lw > 1.1 ? 1.15 : 1 };
   const AN = arm(cfg.bigArm === 'R' || cfg.bigArm === 'N'), AF = arm(cfg.bigArm === 'L');
   const LG = { T: { L: 30, a: 7.2 * lw, b: 5.4 * lw, fb: 1.6 * lw, bb: 1.2 * lw }, S: { L: 31, a: 5.3 * lw, b: 3.6 * lw, fb: .4, bb: 1.8 * lw } };

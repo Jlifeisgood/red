@@ -150,7 +150,11 @@ export function buildHuman2D(cfg, wi) {
     J.thighN.rotation.z = p.thighN; J.thighF.rotation.z = p.thighF;
     if (J.shinN) { J.shinN.rotation.z = p.shinN; J.footN.rotation.z = p.footN; J.shinF.rotation.z = p.shinF; J.footF.rotation.z = p.footF; }
   };
-  return { group: main.root, shadow: shade.root, mats, smats, ctl, kind: 'human', spec: S, apply(p) { put(main.J, p); put(shade.J, p); } };
+  // у обычных зомби своя манера стоять: обе руки тянутся, одна висит плетью или руки волочатся
+  const vr = style === 'zombie' ? (cfg.seed || 0) % 3 : 0;
+  const VAR = [null, { uarmF: .75, farmF: .45, uarmN: -.25, head: .12 }, { uarmF: -.05, uarmN: -.35, farmN: -.2, head: -.12, torso: -.08 }][vr];
+  const tweak = p => { if (!VAR || p.rot > .3) return p; const q = Object.assign({}, p); for (const k in VAR) q[k] += VAR[k]; return q; };
+  return { group: main.root, shadow: shade.root, mats, smats, ctl, kind: 'human', spec: S, apply(p) { p = tweak(p); put(main.J, p); put(shade.J, p); } };
 }
 const WB = { 1: [-6, -56, 6, 8], 2: [-9, -56, 9, 8], 3: [-6, -54, 9, 11], 4: [-9, -62, 9, 9], 5: [-6, -57, 6, 9], 6: [-7, -66, 7, 9] };
 
