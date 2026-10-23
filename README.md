@@ -25,6 +25,8 @@
 Либо запушьте проект на GitHub: workflow `Build Android APK` собирает подписанный release-APK и прикладывает его как artifact `tower-release-apk`.
 
 ### Подпись
+Готовый APK для установки на телефон: https://github.com/Jlifeisgood/red/releases/download/apk/tower.apk (обновляется после каждой сборки ветки `tower-game`).
+
 Постоянный ключ берётся из секретов репозитория: `ANDROID_KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`.
 Если секретов нет, workflow подписывает APK временным ключом: он устанавливается, но обновить приложение поверх сборки с другим ключом нельзя.
 Файл ключа в репозиторий не коммитьте (папка `signing/` и `*.jks` в `.gitignore`).

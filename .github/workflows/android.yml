@@ -5,6 +5,8 @@ on:
 jobs:
   apk:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write          # публикация APK в релиз с постоянной ссылкой
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -52,3 +54,27 @@ jobs:
         with:
           name: tower-release-apk
           path: android/app/build/outputs/apk/release/app-release.apk
+
+      # Постоянная ссылка на свежий APK: релиз с тегом «apk» пересоздаётся при каждой сборке ветки tower-game.
+      # Скачать: https://github.com/<owner>/<repo>/releases/download/apk/tower.apk
+      - name: Publish APK to the «apk» release
+        if: github.ref == 'refs/heads/tower-game'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk tower.apk
+          if [ -n "$KS_B64" ]; then
+            KEYNOTE="Подписано постоянным ключом: новые версии ставятся поверх старых, прогресс сохраняется."
+          else
+            KEYNOTE="Внимание: пока подписано временным ключом. Если «Башня» уже стоит, удалите её перед установкой (сначала сделайте «Экспорт сохранения» в настройках, после установки — «Импорт»)."
+          fi
+          cat > notes.md <<NOTES
+          Свежая сборка игры «Башня» для Android (коммит ${GITHUB_SHA::7}, $(date -u +'%Y-%m-%d %H:%M') UTC).
+
+          **Как установить:** скачайте **tower.apk** ниже, откройте файл на телефоне и разрешите установку из этого источника.
+
+          $KEYNOTE
+          NOTES
+          gh release delete apk --yes --cleanup-tag || true
+          gh release create apk tower.apk --target "$GITHUB_SHA" --title "Башня — свежая сборка" --notes-file notes.md --latest
