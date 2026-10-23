@@ -11,12 +11,15 @@ function baked(key, spec) {
   if (!b) { b = bake(spec.bounds, spec.draw, spec.far); TEX.set(key, b); if (TEX.size > 400) { const k0 = TEX.keys().next().value; TEX.get(k0).tex.dispose(); TEX.delete(k0); } }
   return b;
 }
-function sprite(key, spec, order, mats, glow) {
+// mode: 'main' — сам рисунок, 'glow' — светящаяся накладка (оружие), 'shadow' — силуэт для тени на стене
+function sprite(key, spec, order, mats, mode = 'main') {
   const b = baked(key, spec);
-  const mat = new THREE.MeshStandardMaterial({ map: b.tex, emissiveMap: b.tex, emissive: new THREE.Color(glow ? 2.2 : .4, glow ? 2.2 : .4, glow ? 2.2 : .4), transparent: true, alphaTest: .3, depthWrite: false, roughness: 1, metalness: 0, side: THREE.DoubleSide });
-  mat.userData.baseEmissive = glow ? 2.2 : .4; if (glow) mat.userData.glow = true;
+  // у тени альфа-тест считается от уже умноженной на opacity альфы; перекрытия частей отсекает тест глубины (все части в одной плоскости)
+  const mat = new THREE.MeshBasicMaterial({ map: b.tex, transparent: true, alphaTest: mode === 'shadow' ? .2 : .3, depthWrite: mode === 'shadow', side: THREE.DoubleSide });
+  if (mode === 'shadow') { mat.color.setRGB(0, 0, 0); mat.opacity = .5; mat.depthFunc = THREE.LessDepth; }
+  if (mode === 'glow') { mat.color.setScalar(2.2); mat.blending = THREE.AdditiveBlending; mat.userData.glow = true; }
   const m = new THREE.Mesh(new THREE.PlaneGeometry(b.w, b.h), mat);
-  m.position.set(b.cx, -b.cy, 0); m.renderOrder = order; m.castShadow = true;
+  m.position.set(b.cx, -b.cy, 0); m.renderOrder = mode === 'shadow' ? 3 : order;
   mats.push(mat); return m;
 }
 const G = (parent, x = 0, y = 0) => { const g = new THREE.Group(); g.position.set(x, y, 0); parent.add(g); return g; };
@@ -103,69 +106,72 @@ function controller(lib, zero) {
 
 // ---------- сборка человека ----------
 export function buildHuman2D(cfg, wi) {
-  const S = humanSpec(cfg), key = JSON.stringify(cfg) + '|', mats = [];
-  const part = (n, order) => sprite(key + n, S.parts[n], order, mats);
-  const root = new THREE.Group(), body = G(root), hips = G(body, 0, S.layout.hipY);
-  const torsoG = G(hips);
-  const J = {};
-  // дальние конечности
-  const legF = G(hips, -1.4, 0); legF.add(part('thighF', 14)); J.thighF = legF;
-  if (!cfg.legless) { const sh = G(legF, 0, -S.leg.T.L); sh.add(part('shinF', 13)); J.shinF = sh; const ft = G(sh, 0, -S.leg.S.L); ft.add(part('footF', 15)); J.footF = ft; }
-  const armF = G(torsoG, -1.6, -S.layout.shoulder[1] + .6); armF.add(part('uarmF', 11)); J.uarmF = armF;
-  const faF = G(armF, 0, -S.arm.F.U.L); faF.add(part('farmF', 10)); J.farmF = faF;
-  const haF = G(faF, 0, -S.arm.F.F.L); haF.add(part('handF', 12)); J.handF = haF;
-  // корпус, ближняя нога, голова
-  torsoG.add(part('torso', 20)); J.torso = torsoG;
-  const legN = G(hips, 1.4, 0); legN.add(part('thighN', 17)); J.thighN = legN;
-  if (!cfg.legless) { const sh = G(legN, 0, -S.leg.T.L); sh.add(part('shinN', 16)); J.shinN = sh; const ft = G(sh, 0, -S.leg.S.L); ft.add(part('footN', 19)); J.footN = ft; }
-  if (S.parts.coatTail) hips.add(part('coatTail', 21));
-  const neck = G(torsoG, S.layout.neck[0], -S.layout.neck[1]); const hd = part('head', 28); const hs = H.headScale * (cfg.headScale || 1); hd.scale.setScalar(hs); hd.position.multiplyScalar(hs); neck.add(hd); J.head = neck;
-  // ближняя рука с оружием
-  const armN = G(torsoG, .6, -S.layout.shoulder[1]); armN.add(part('uarmN', 31)); J.uarmN = armN;
-  const faN = G(armN, 0, -S.arm.N.U.L); faN.add(part('farmN', 30)); J.farmN = faN;
-  const haN = G(faN, 0, -S.arm.N.F.L); haN.add(part('handN', 33)); J.handN = haN;
-  let weapon = null;
-  if (wi > 0) {
-    weapon = G(haN, .6, -4.6); weapon.rotation.z = -2.15;
-    weapon.add(sprite('w' + wi, { bounds: WB[wi], draw: ctx => drawWeapon(ctx, wi, 'all'), far: 0 }, 32, mats, false));
-    if (wi >= 4) { const g = sprite('wg' + wi, { bounds: WB[wi], draw: ctx => drawWeapon(ctx, wi, 'glow'), far: 0 }, 34, [], true); g.material.blending = THREE.AdditiveBlending; g.castShadow = false; weapon.add(g); }
-  }
+  const S = humanSpec(cfg), key = JSON.stringify(cfg) + '|', mats = [], smats = [];
+  const assemble = (shadow) => {
+    const part = (n, order) => { const m = sprite(key + n, S.parts[n], order, shadow ? smats : mats, shadow ? 'shadow' : 'main'); m.userData.part = n; return m; };
+    const root = new THREE.Group(), body = G(root), hips = G(body, 0, S.layout.hipY);
+    const torsoG = G(hips);
+    const J = { body, torso: torsoG };
+    // дальние конечности
+    const legF = G(hips, -1.4, 0); legF.add(part('thighF', 14)); J.thighF = legF;
+    if (!cfg.legless) { const sh = G(legF, 0, -S.leg.T.L); sh.add(part('shinF', 13)); J.shinF = sh; const ft = G(sh, 0, -S.leg.S.L); ft.add(part('footF', 15)); J.footF = ft; }
+    const armF = G(torsoG, -1.6, -S.layout.shoulder[1] + .6); armF.add(part('uarmF', 11)); J.uarmF = armF;
+    const faF = G(armF, 0, -S.arm.F.U.L); faF.add(part('farmF', 10)); J.farmF = faF;
+    const haF = G(faF, 0, -S.arm.F.F.L); haF.add(part('handF', 12)); J.handF = haF;
+    // корпус, ближняя нога, голова
+    torsoG.add(part('torso', 20));
+    const legN = G(hips, 1.4, 0); legN.add(part('thighN', 17)); J.thighN = legN;
+    if (!cfg.legless) { const sh = G(legN, 0, -S.leg.T.L); sh.add(part('shinN', 16)); J.shinN = sh; const ft = G(sh, 0, -S.leg.S.L); ft.add(part('footN', 19)); J.footN = ft; }
+    if (S.parts.coatTail) hips.add(part('coatTail', 21));
+    const neck = G(torsoG, S.layout.neck[0], -S.layout.neck[1]); const hd = part('head', 28); const hs = H.headScale * (cfg.headScale || 1); hd.scale.setScalar(hs); hd.position.multiplyScalar(hs); neck.add(hd); J.head = neck;
+    // ближняя рука с оружием
+    const armN = G(torsoG, .6, -S.layout.shoulder[1]); armN.add(part('uarmN', 31)); J.uarmN = armN;
+    const faN = G(armN, 0, -S.arm.N.U.L); faN.add(part('farmN', 30)); J.farmN = faN;
+    const haN = G(faN, 0, -S.arm.N.F.L); haN.add(part('handN', 33)); J.handN = haN;
+    if (wi > 0) {
+      const weapon = G(haN, .6, -4.6); weapon.rotation.z = -2.15;
+      weapon.add(sprite('w' + wi, { bounds: WB[wi], draw: ctx => drawWeapon(ctx, wi, 'all'), far: 0 }, 32, shadow ? smats : mats, shadow ? 'shadow' : 'main'));
+      if (wi >= 4 && !shadow) weapon.add(sprite('wg' + wi, { bounds: WB[wi], draw: ctx => drawWeapon(ctx, wi, 'glow'), far: 0 }, 34, [], 'glow'));
+    }
+    return { root, J };
+  };
+  const main = assemble(false), shade = assemble(true);
   const style = cfg.style && HUMAN[cfg.style] ? cfg.style : cfg.zombie ? 'zombie' : 'hero';
   const lib = Object.assign({}, HUMAN[style], { hit: HIT, death: style === 'crawler' ? DEATH_CRAWL : DEATH });
   const ctl = controller(lib);
-  return {
-    group: root, mats, ctl, kind: 'human',
-    apply(p) {
-      body.position.set(p.bx, p.by, 0); body.rotation.z = p.rot;
-      torsoG.rotation.z = p.torso; J.head.rotation.z = p.head;
-      J.uarmN.rotation.z = p.uarmN; J.farmN.rotation.z = p.farmN; J.handN.rotation.z = p.handN;
-      J.uarmF.rotation.z = p.uarmF; J.farmF.rotation.z = p.farmF; J.handF.rotation.z = p.handF;
-      J.thighN.rotation.z = p.thighN; J.thighF.rotation.z = p.thighF;
-      if (J.shinN) { J.shinN.rotation.z = p.shinN; J.footN.rotation.z = p.footN; J.shinF.rotation.z = p.shinF; J.footF.rotation.z = p.footF; }
-    },
+  const put = (J, p) => {
+    J.body.position.set(p.bx, p.by, 0); J.body.rotation.z = p.rot;
+    J.torso.rotation.z = p.torso; J.head.rotation.z = p.head;
+    J.uarmN.rotation.z = p.uarmN; J.farmN.rotation.z = p.farmN; J.handN.rotation.z = p.handN;
+    J.uarmF.rotation.z = p.uarmF; J.farmF.rotation.z = p.farmF; J.handF.rotation.z = p.handF;
+    J.thighN.rotation.z = p.thighN; J.thighF.rotation.z = p.thighF;
+    if (J.shinN) { J.shinN.rotation.z = p.shinN; J.footN.rotation.z = p.footN; J.shinF.rotation.z = p.shinF; J.footF.rotation.z = p.footF; }
   };
+  return { group: main.root, shadow: shade.root, mats, smats, ctl, kind: 'human', spec: S, apply(p) { put(main.J, p); put(shade.J, p); } };
 }
 const WB = { 1: [-6, -56, 6, 8], 2: [-9, -56, 9, 8], 3: [-6, -54, 9, 11], 4: [-9, -62, 9, 9], 5: [-6, -57, 6, 9], 6: [-7, -66, 7, 9] };
 
 // ---------- сборка зверя ----------
 export function buildQuad2D(cfg) {
-  const S = quadSpec(cfg), key = JSON.stringify(cfg) + '|', mats = [], k = S.k, b = S.b;
-  const part = (n, order) => sprite(key + n, S.parts[n], order, mats);
-  const root = new THREE.Group(), body = G(root, 0, 39);
-  const J = {};
-  const leg = (name, x, y, order, far) => { const u = G(body, x, y); u.add(part(name[0] + 'u' + far, order + 1)); const l = G(u, 0, -16); l.add(part(name[0] + 'l' + far, order)); J[name[0] + 'u' + far] = u; J[name[0] + 'l' + far] = l; };
-  leg('f', 17 * k - 2, -4 * b, 10, 'F'); leg('h', -21 * k - 2, -5 * b, 12, 'F');
-  const tail = G(body, -30 * k, 6 * b); tail.add(part('tail', 16)); J.tail = tail;
-  body.add(part('body', 20));
-  leg('f', 18 * k, -4 * b, 17, 'N'); leg('h', -21 * k, -5 * b, 17, 'N');
-  const head = G(body, 22 * k, 10 * b); head.add(part('head', 30)); J.head = head;
-  const ctl = controller(QUAD);
-  return {
-    group: root, mats, ctl, kind: 'quad',
-    apply(p) {
-      body.position.set(p.bx, 39 * Math.min(1, b) + p.by, 0); body.rotation.z = p.body;
-      J.head.rotation.z = p.head; J.tail.rotation.z = -2.2 + p.tail;
-      for (const s of ['N', 'F']) { J['fu' + s].rotation.z = p['fu' + s]; J['fl' + s].rotation.z = p['fl' + s]; J['hu' + s].rotation.z = p['hu' + s]; J['hl' + s].rotation.z = p['hl' + s]; }
-    },
+  const S = quadSpec(cfg), key = JSON.stringify(cfg) + '|', mats = [], smats = [], k = S.k, b = S.b;
+  const assemble = (shadow) => {
+    const part = (n, order) => { const m = sprite(key + n, S.parts[n], order, shadow ? smats : mats, shadow ? 'shadow' : 'main'); m.userData.part = n; return m; };
+    const root = new THREE.Group(), body = G(root, 0, 39);
+    const J = { body };
+    const leg = (name, x, y, order, far) => { const u = G(body, x, y); u.add(part(name[0] + 'u' + far, order + 1)); const l = G(u, 0, -16); l.add(part(name[0] + 'l' + far, order)); J[name[0] + 'u' + far] = u; J[name[0] + 'l' + far] = l; };
+    leg('f', 17 * k - 2, -4 * b, 10, 'F'); leg('h', -21 * k - 2, -5 * b, 12, 'F');
+    const tail = G(body, -30 * k, 6 * b); tail.add(part('tail', 16)); J.tail = tail;
+    body.add(part('body', 20));
+    leg('f', 18 * k, -4 * b, 17, 'N'); leg('h', -21 * k, -5 * b, 17, 'N');
+    const head = G(body, 22 * k, 10 * b); head.add(part('head', 30)); J.head = head;
+    return { root, J };
   };
+  const main = assemble(false), shade = assemble(true);
+  const ctl = controller(QUAD);
+  const put = (J, p) => {
+    J.body.position.set(p.bx, 39 * Math.min(1, b) + p.by, 0); J.body.rotation.z = p.body;
+    J.head.rotation.z = p.head; J.tail.rotation.z = -2.2 + p.tail;
+    for (const s of ['N', 'F']) { J['fu' + s].rotation.z = p['fu' + s]; J['fl' + s].rotation.z = p['fl' + s]; J['hu' + s].rotation.z = p['hu' + s]; J['hl' + s].rotation.z = p['hl' + s]; }
+  };
+  return { group: main.root, shadow: shade.root, mats, smats, ctl, kind: 'quad', spec: S, apply(p) { put(main.J, p); put(shade.J, p); } };
 }

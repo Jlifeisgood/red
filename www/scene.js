@@ -1,25 +1,30 @@
 'use strict';
-// ===== Сцена: вид сбоку на SVG. Герой ходит по этажу, враги стоят справа =====
+// ===== Сцена: этаж башни в разрезе, как в Skyhill. Комната | комната | лестница с лифтом | комната =====
+// Мир задан в координатах SVG (y вниз). WebGL (chars3d.bundle.js) рисует здание и персонажей, SVG-слои — зоны нажатия,
+// всплывающие числа и упрощённую графику, если WebGL недоступен.
 
-const FLOOR_Y = 340;
-const DOOR_CX = [50, 140, 230];
-const LIFT_CX = 318;
-const FURN_CX = [62, 169, 261];
-const HERO_HOME = 46, HERO_BASE = 104, HERO_FIGHT = 96, FOE_X = 270, HERO_Y = 352, FOE_Y = 349;
-const ROOM_ICON = { loot: '📦', enemy: '☠', rest: '🛏', trap: '⚠', trader: '🧳', event: '❓', empty: '·', vending: '🥤', locked: '🔒' };
-const SCREEN_ICON = { vending: '🥤', trader: '🧳', event: '❓', locked: '🔒' };
-const KIND_BOX = { rat: [50, 130], dog: [100, 140], bat: [112, 150], blob: [78, 100], drone: [132, 110], human: [134, 100], robot: [154, 100], ghost: [128, 90], chimera: [122, 150], brute: [136, 130], bug: [52, 130] };
+const FLOOR_Y = 400, ROOM_H = 210, SLAB = 24;
+const COMPS = [{ k: 'room', i: 0, x0: 0, x1: 226 }, { k: 'room', i: 1, x0: 232, x1: 458 }, { k: 'hall', x0: 464, x1: 684 }, { k: 'room', i: 2, x0: 690, x1: 916 }];
+const HALL = COMPS[2], LIFT_X = HALL.x1 - 44, BX0 = -22, BX1 = 938;
+const HERO_HOME = HALL.x0 + 112, HERO_Y = FLOOR_Y - 3, FOE_Y = FLOOR_Y - 3;
+const BASE_COMP = { f0: 0, f1: 1, f2: 3 };          // убежище: спальня, кухня, мастерская
+const LAYOUT = { comps: COMPS, floorY: FLOOR_Y, roomH: ROOM_H, slab: SLAB, liftX: LIFT_X, bw: BX1 - BX0 };
+const ROOM_ICON = { loot: 'crate', enemy: 'skull', rest: 'bed', trap: 'warn', trader: 'case', event: 'help', vending: 'cup', locked: 'lock' };
 
-let heroX = HERO_HOME, sceneBusy = false, sceneKey = null, sceneMode = '', bgKey = '', heroKey = '', foeKey = '', walkMs = 520;
+let heroX = HERO_HOME, sceneBusy = false, sceneKey = null, sceneMode = '', heroKey = '', foeKey = '', walkMs = 520;
+let curComp = 2, liftOpen = false, revealing = -1, introT = [];
+const FIGHT = { hx: 0, fx: 0, dir: 1 };
 try { if (localStorage.getItem('tower-fast') === '1') walkMs = 260; } catch (e) {}
 
-const $svg = id => document.getElementById(id);
+const roomComp = i => COMPS.findIndex(c => c.k === 'room' && c.i === i);
+const compAt = x => { let best = 2, d = 1e9; COMPS.forEach((c, j) => { const m = x < c.x0 ? c.x0 - x : x > c.x1 ? x - c.x1 : 0; if (m < d) { d = m; best = j; } }); return best; };
+const leftOfHall = c => c.x1 <= HALL.x0;
+const entryX = c => leftOfHall(c) ? c.x1 - 46 : c.x0 + 46;
 
-// ---------- камера: окно мира (координаты SVG), общее для SVG-слоёв и WebGL ----------
-// Сцена во весь экран: этаж в разрезе, камера плавно следует за героем, в бою — центр между бойцами.
-const VIEW = { x: 0, y: 24, w: 360, h: 400 };
+// ---------- камера: окно мира, общее для SVG и WebGL ----------
+const VIEW = { x: 0, y: 160, w: 900, h: 340 };
 window.VIEW = VIEW;
-const CAM = { cx: null, under: null, last: 0, key: '' };
+const CAM = { cx: null, hv: null, last: 0, key: '' };
 function heroLiveX() {
   const el = document.getElementById('hero'); if (!el) return heroX;
   const t = getComputedStyle(el).transform;
@@ -30,58 +35,54 @@ function camTick(ts) {
   const sc = document.getElementById('scene'); if (!sc) return;
   const W = sc.clientWidth, Hp = sc.clientHeight; if (!W || !Hp) return;
   const dt = Math.min(.1, CAM.last ? (ts - CAM.last) / 1000 : .016); CAM.last = ts;
-  const fight = typeof S !== 'undefined' && S && S.screen === 'fight';
-  const a = W / Hp, wv = Math.max(fight ? 320 : 344, 330 * a), hv = wv / a;
-  const lo = wv / 2 - 8, hi = 360 - wv / 2 + 14;          // весь коридор с лифтом почти целиком в кадре, небольшой сдвиг за героем
-  let target = fight ? (HERO_FIGHT + FOE_X) / 2 + 13 : Math.max(lo, Math.min(hi, heroLiveX() + 40));
-  if (lo > hi) target = 180;
+  const a = W / Hp, fight = typeof S !== 'undefined' && S && S.screen === 'fight';
+  // на этаже видно весь этаж целиком, в бою камера подъезжает ближе
+  const want = ROOM_H + 2 * SLAB + (fight ? 70 : 150);
+  CAM.hv = CAM.hv == null ? want : CAM.hv + (want - CAM.hv) * Math.min(1, dt * 2.5);
+  let hv = CAM.hv, wv = hv * a;
+  if (wv < 360) { wv = 360; hv = wv / a; }
+  const u = hv / Hp, top = Hp > 500 ? 70 : 52, bottom = Hp > 500 ? 90 : 70;
+  const lo = BX0 + wv / 2 - 40, hi = BX1 - wv / 2 + 40;
+  let target = fight ? (FIGHT.hx + FIGHT.fx) / 2 : heroLiveX();
+  target = lo > hi ? (BX0 + BX1) / 2 : Math.max(lo, Math.min(hi, target));
   if (CAM.cx == null) CAM.cx = target;
-  CAM.cx += (target - CAM.cx) * Math.min(1, dt * 3.2);
-  // нижняя панель (журнал + кнопки) перекрывает низ сцены: пол держим над ней
-  const bot = document.getElementById('bottom'), sheet = document.getElementById('sheet');
-  const px = sheet && sheet.classList.contains('open') ? 150 : Math.max(110, Math.min(260, bot ? bot.offsetHeight : 150));
-  CAM.under = CAM.under == null ? px : CAM.under + (px - CAM.under) * Math.min(1, dt * 4);
-  const under = CAM.under * wv / W;
-  VIEW.w = wv; VIEW.h = hv; VIEW.x = CAM.cx - wv / 2; VIEW.y = HERO_Y + 30 + under - hv;
+  CAM.cx += (target - CAM.cx) * Math.min(1, dt * 3);
+  const yc = FLOOR_Y - ROOM_H / 2;
+  VIEW.w = wv; VIEW.h = hv; VIEW.x = CAM.cx - wv / 2; VIEW.y = yc - (Hp / 2 + (top - bottom) / 2) * u;
   const vb = `${VIEW.x.toFixed(2)} ${VIEW.y.toFixed(2)} ${wv.toFixed(2)} ${hv.toFixed(2)}`;
   if (vb !== CAM.key) { CAM.key = vb; document.getElementById('sv').setAttribute('viewBox', vb); document.getElementById('ov').setAttribute('viewBox', vb); }
 }
 requestAnimationFrame(camTick);
 
+// ---------- разметка: зоны нажатия и простая графика без WebGL ----------
+const NS = 'http://www.w3.org/2000/svg';
+function svgEl(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
 function initScene() {
   const sv = $('sv');
   sv.setAttribute('preserveAspectRatio', 'xMidYMid meet'); $('ov').setAttribute('preserveAspectRatio', 'xMidYMid meet');
   sv.innerHTML = ART.defs + '<g id="bg"></g><g id="doors"></g><g id="furns"></g><g id="liftg"></g><g id="foe"><g id="foe-in"><g id="foe-art"></g></g></g><g id="hero"><g id="hero-in"></g></g>';
-  $('ov').innerHTML = '<g id="foe-o"><g id="foe-ui"></g><g id="foe-zones"></g></g><g id="fl"></g>';
-  const hit = '<rect x="-48" y="-170" width="96" height="170" fill="#fff" fill-opacity="0.001"/>';
-  DOOR_CX.forEach((x, i) => {
-    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    g.setAttribute('class', 'door'); g.setAttribute('id', 'door' + i);
-    g.style.transform = `translate(${x}px,${FLOOR_Y}px)`;
-    g.innerHTML = ART.door(i + 1) + hit;
-    g.onclick = () => sceneTap(i);
-    $('doors').appendChild(g);
-  });
-  const lg = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-  lg.setAttribute('class', 'lift'); lg.setAttribute('id', 'lift');
-  lg.style.transform = `translate(${LIFT_CX}px,${FLOOR_Y}px)`;
-  lg.innerHTML = ART.lift() + hit; lg.onclick = () => sceneTap('lift');
-  $('liftg').appendChild(lg);
-  FURN_CX.forEach((x, i) => {
-    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    g.setAttribute('class', 'furn'); g.setAttribute('id', 'furn' + i);
-    g.style.transform = `translate(${x}px,${FLOOR_Y}px)`;
-    g.innerHTML = ART.furn[i] + '<rect x="-56" y="-140" width="112" height="140" fill="#fff" fill-opacity="0.001"/>';
-    g.onclick = () => sceneTap('f' + i);
-    $('furns').appendChild(g);
-  });
-  $('foe').style.transform = `translate(${FOE_X}px,${FOE_Y}px)`; $('foe-o').style.transform = `translate(${FOE_X}px,${FOE_Y}px)`;
+  $('ov').innerHTML = '<g id="marks"></g><g id="foe-o"><g id="foe-zones"></g></g><g id="fl"></g>';
+  const hitRect = (g, c) => svgEl('rect', { x: c.x0, y: FLOOR_Y - ROOM_H, width: c.x1 - c.x0, height: ROOM_H, fill: '#fff', 'fill-opacity': '0.001' }, g);
+  [0, 1, 2].forEach(i => { const g = svgEl('g', { class: 'door', id: 'door' + i }, $('doors')); hitRect(g, COMPS[roomComp(i)]); g.onclick = () => sceneTap(i); });
+  const lg = svgEl('g', { class: 'lift', id: 'lift' }, $('liftg'));
+  svgEl('rect', { x: LIFT_X - 40, y: FLOOR_Y - 150, width: 80, height: 150, fill: '#fff', 'fill-opacity': '0.001' }, lg); lg.onclick = () => sceneTap('lift');
+  ['f0', 'f1', 'f2'].forEach((f, i) => { const g = svgEl('g', { class: 'furn', id: 'furn' + i }, $('furns')); hitRect(g, COMPS[BASE_COMP[f]]); g.onclick = () => sceneTap(f); });
   $('hero').style.transform = `translate(${HERO_HOME}px,${HERO_Y}px)`;
   $('foe-zones').addEventListener('click', ev => {
     const z = ev.target.getAttribute && ev.target.getAttribute('data-z');
     if (!z || S.screen !== 'fight') return;
     sfx('click'); attack(z.startsWith('arm') ? 'arms' : z);
   });
+}
+// плоская запасная графика здания (если нет WebGL)
+function svgBuilding(inBase, zone) {
+  const pal = ['#3d4540', '#4c3a48', '#4a525a', '#7c938d', '#3c2f44'][zone] || '#4c3a48';
+  let s = `<rect x="${BX0 - 400}" y="${FLOOR_Y - ROOM_H * 3}" width="${BX1 - BX0 + 800}" height="${ROOM_H * 6}" fill="#0b0e14"/>`;
+  s += `<rect x="${BX0}" y="${FLOOR_Y - ROOM_H * 2 - SLAB * 2}" width="${BX1 - BX0}" height="${ROOM_H * 3 + SLAB * 4}" fill="#101113"/>`;
+  COMPS.forEach(c => { s += `<rect x="${c.x0}" y="${FLOOR_Y - ROOM_H}" width="${c.x1 - c.x0}" height="${ROOM_H}" fill="${inBase ? '#5c4430' : c.k === 'hall' ? '#3a3e3c' : pal}"/><rect x="${c.x0}" y="${FLOOR_Y - 6}" width="${c.x1 - c.x0}" height="6" fill="#2a2420"/>`; });
+  s += `<path d="M${HALL.x0 + 6} ${FLOOR_Y} L${HALL.x0 + 134} ${FLOOR_Y - ROOM_H}" stroke="#20242a" stroke-width="14"/><rect x="${LIFT_X - 32}" y="${FLOOR_Y - 132}" width="64" height="128" fill="#7a8086" stroke="#222"/>`;
+  s += `<text x="${HALL.x0 + 12}" y="${FLOOR_Y - 140}" font-size="44" font-weight="700" fill="rgba(230,226,214,.25)">${inBase ? '' : S.floor}</text>`;
+  return s;
 }
 
 // ---------- перемещение героя ----------
@@ -96,27 +97,26 @@ function setHero(x, walk, instant) {
 function walkThen(x, fn) {
   if (sceneBusy) return;
   sceneBusy = true;
-  const ms = Math.max(240, Math.abs(x - heroX) * walkMs / 100);
+  introT.forEach(clearTimeout); introT = []; $('hero').classList.remove('boarding'); liftOpen = false;   // игрок пошёл, не дожидаясь выхода из лифта
+  const ms = Math.max(240, Math.abs(x - heroX) * walkMs / 170);
   $('hero').style.transitionDuration = ms + 'ms';
   setHero(x, true);
   const steps = setInterval(() => sfx('step'), 230);
-  setTimeout(() => { clearInterval(steps); sceneBusy = false; $('hero').classList.remove('walk'); fn(); }, ms + 30);
+  setTimeout(() => { clearInterval(steps); sceneBusy = false; $('hero').classList.remove('walk'); curComp = compAt(x); fn(); }, ms + 30);
 }
 function enterDoor(i) {
   const r = S.rooms[i];
-  if (S.screen !== 'map' || !r || r.done) return;
-  walkThen(DOOR_CX[i] + 4, () => {
-    sfx('door'); const d = $('door' + i); d.classList.add('open'); setTimeout(() => d.classList.remove('open'), 500);
-    openRoom(i);
-  });
+  if (S.screen !== 'map' || !r) return;
+  const c = COMPS[roomComp(i)];
+  if (r.done) return walkThen(entryX(c), () => render());
+  walkThen(entryX(c), () => { sfx('door'); revealing = i; setTimeout(() => { revealing = -1; }, 900); openRoom(i); });
 }
 function rideAnim() {
   if (S.screen !== 'map' || !S.lift || S.lift.state !== 'ok') return;
-  walkThen(LIFT_CX - 8, () => {
-    sfx('ding'); const l = $('lift'); l.classList.add('open'); setTimeout(() => l.classList.remove('open'), 600);
-    $('hero').classList.add('boarding');
-    setTimeout(() => $('hero').classList.remove('boarding'), 600);
-    ride();
+  walkThen(LIFT_X, () => {
+    sfx('ding'); liftOpen = true; render();
+    setTimeout(() => { $('hero').classList.add('boarding'); }, 350);
+    setTimeout(() => { liftOpen = false; $('hero').classList.remove('boarding'); ride(); }, 900);
   });
 }
 function sceneTap(i) {
@@ -124,15 +124,16 @@ function sceneTap(i) {
   if (S.screen === 'map') {
     if (i === 'lift') {
       if (S.lift && S.lift.state === 'ok') rideAnim();
-      else walkThen(LIFT_CX - 40, () => { S.screen = 'liftmenu'; render(); });
+      else walkThen(LIFT_X - 30, () => { S.screen = 'liftmenu'; render(); });
       return;
     }
     if (typeof i === 'number') enterDoor(i);
   } else if (S.screen === 'base' && S.inBase) {
-    if (i === 'lift') return walkThen(LIFT_CX - 8, returnUp);
-    if (i === 'f0') return walkThen(FURN_CX[0] + 30, sleep);
-    if (i === 'f1') return walkThen(FURN_CX[1], () => { S.screen = 'kitchen'; render(); });
-    if (i === 'f2') return walkThen(FURN_CX[2], () => { S.screen = 'craft'; render(); });
+    if (i === 'lift') return walkThen(LIFT_X, returnUp);
+    const c = COMPS[BASE_COMP[i]]; if (!c) return;
+    if (i === 'f0') return walkThen(entryX(c), sleep);
+    if (i === 'f1') return walkThen(entryX(c), () => { S.screen = 'kitchen'; render(); });
+    if (i === 'f2') return walkThen(entryX(c), () => { S.screen = 'craft'; render(); });
   }
 }
 
@@ -155,9 +156,9 @@ function lunge(who) {
   setTimeout(() => el.classList.remove(c), 420);
 }
 function floatText(text, cls, where) {
-  const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-  const x = where === 'sc-enemy' ? FOE_X + (Math.random() * 24 - 12) : HERO_FIGHT + (Math.random() * 20 - 10);
-  const y = where === 'sc-enemy' ? FOE_Y - 140 : HERO_Y - 140;
+  const t = document.createElementNS(NS, 'text');
+  const x = (where === 'sc-enemy' ? FIGHT.fx : FIGHT.hx) + (Math.random() * 20 - 10);
+  const y = (where === 'sc-enemy' ? FOE_Y : HERO_Y) - 150;
   t.setAttribute('x', x); t.setAttribute('y', y); t.setAttribute('class', 'ft ' + cls); t.setAttribute('text-anchor', 'middle');
   t.textContent = text; $('fl').appendChild(t);
   setTimeout(() => t.remove(), 950);
@@ -166,7 +167,7 @@ function floatText(text, cls, where) {
 // ---------- отрисовка ----------
 function enemyBox(name) {
   if (window.GL3D && GL3D.ready && GL3D.enabled) return GL3D.box(name);
-  const d = ENEMY_ART[name] || ['blob', 'grey', 1.2], b = KIND_BOX[d[0]] || [100, 100];
+  const d = ENEMY_ART[name] || ['blob', 'grey', 1.2], b = { rat: [50, 130], dog: [100, 140], human: [134, 100] }[d[0]] || [110, 100];
   return { h: b[0] * d[2], w: b[1] * d[2] };
 }
 function renderScene() {
@@ -174,68 +175,78 @@ function renderScene() {
   $('scene').style.visibility = hidden ? 'hidden' : 'visible';
   if (hidden) { if (window.GL3D) GL3D.update({ visible: false }); return; }
   const fight = S.screen === 'fight' && !!S.enemy, inBase = !!S.inBase;
-  const zone = zoneOf(S.floor), key = inBase ? 'base' : 'z' + zone;
-  if (bgKey !== key) { bgKey = key; $('bg').innerHTML = inBase ? ART.base() : ART.bg[zone](); }
+  const zone = zoneOf(S.floor), gl = window.GL3D && GL3D.ready && GL3D.enabled;
   const sc = $('scene');
-  sc.className = (fight ? 'fight ' : '') + (S.screen === 'dead' ? 'dead ' : '') + (SCREEN_ICON[S.screen] ? 'dim ' : '') + (inBase ? 'base' : 'z' + zone) + (window.GL3D && GL3D.ready && GL3D.enabled ? ' gl' : '');
+  sc.className = (fight ? 'fight ' : '') + (S.screen === 'dead' ? 'dead ' : '') + (inBase ? 'base' : 'z' + zone) + (gl ? ' gl' : '');
 
-  // герой
+  // новый этаж: герой выходит из лифта
+  const rk = inBase ? 'base' + S.floor : S.rooms;
+  if (sceneKey !== rk) {
+    sceneKey = rk; sceneBusy = false; curComp = 2; revealing = -1;
+    $('bg').innerHTML = svgBuilding(inBase, zone);
+    heroX = LIFT_X; setHero(LIFT_X, false, true); $('hero').classList.add('boarding');
+    liftOpen = true;
+    introT.forEach(clearTimeout);
+    introT = [setTimeout(() => { $('hero').classList.remove('boarding'); $('hero').style.transitionDuration = '650ms'; setHero(HERO_HOME, true); }, 260),
+      setTimeout(() => { $('hero').classList.remove('walk'); liftOpen = false; introT = []; render(); }, 950)];
+  }
+  // герой (запасная SVG-графика)
   const hk = S.wi + ':' + S.ai;
   if (heroKey !== hk) { heroKey = hk; $('hero-in').innerHTML = ART.hero(S.wi, S.ai); }
-  const rk = inBase ? 'base' : S.rooms;
-  if (sceneKey !== rk) {                                   // новый этаж: герой входит слева
-    sceneKey = rk; sceneBusy = false; heroX = -40; setHero(-40, false, true);
-    $('hero').style.transitionDuration = '700ms'; setTimeout(() => setHero(inBase ? HERO_BASE : HERO_HOME, true), 30);
-    setTimeout(() => $('hero').classList.remove('walk'), 760);
+  // бой — в комнате, где стоит герой: герой у входа, враг в глубине
+  const mode = fight ? 'fight' : 'floor', c = COMPS[curComp] || HALL;
+  if (fight) {
+    const left = leftOfHall(c);
+    FIGHT.hx = left ? c.x1 - 48 : c.x0 + 48; FIGHT.fx = left ? c.x0 + 74 : c.x1 - 74; FIGHT.dir = left ? -1 : 1;
   }
-  const mode = fight ? 'fight' : 'floor';
   if (mode !== sceneMode) {
     sceneMode = mode;
-    if (fight) { $('hero').style.transitionDuration = '300ms'; $('hero').classList.remove('face-l'); $('hero').style.transform = `translate(${HERO_FIGHT}px,${HERO_Y}px)`; }
-    else { $('hero').style.transform = `translate(${heroX}px,${HERO_Y}px)`; }
+    if (fight) { $('hero').style.transitionDuration = '300ms'; $('hero').classList.toggle('face-l', FIGHT.dir < 0); heroX = FIGHT.hx; $('hero').style.transform = `translate(${FIGHT.hx}px,${HERO_Y}px)`; }
   }
   $('hero-in').classList.toggle('dead', S.screen === 'dead');
 
-  // двери, лифт, мебель
+  // зоны нажатия и значки известных комнат
+  let marks = '';
   for (let i = 0; i < 3; i++) {
     const g = $('door' + i), r = S.rooms[i];
     g.style.display = (!inBase && !fight && r) ? '' : 'none';
-    if (!r) continue;
-    const known = r.done || r.known;
-    g.setAttribute('class', 'door' + (r.done ? ' done' : '') + (known && r.type === 'locked' ? ' locked' : ''));
-    g.querySelector('.ric').textContent = known ? (ROOM_ICON[r.type] || '') : '';
     $('furn' + i).style.display = (inBase && !fight) ? '' : 'none';
+    if (inBase || !r) continue;
+    const cc = COMPS[roomComp(i)], known = r.known || r.type === 'locked';
+    g.setAttribute('class', 'door' + (r.done ? ' done' : '') + (known && r.type === 'locked' ? ' locked' : ''));
+    if (!r.done && !fight && revealing !== i) {
+      const mx = (cc.x0 + cc.x1) / 2, my = FLOOR_Y - ROOM_H / 2;
+      const icon = known && typeof ICO !== 'undefined' ? ICO[ROOM_ICON[r.type]] || '' : '';
+      marks += `<g class="rmark" transform="translate(${mx} ${my})"><circle r="17" fill="rgba(10,10,12,.7)" stroke="rgba(230,220,190,.55)" stroke-width="1.5"/>` +
+        (icon ? `<g transform="translate(-12 -12)" fill="none" stroke="${r.type === 'enemy' || r.type === 'trap' ? '#ff6a4a' : '#e8dcc0'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icon}</g>` : '<text y="7" text-anchor="middle" font-size="20" font-weight="700" fill="#e8dcc0">?</text>') + '</g>';
+    }
   }
+  $('marks').innerHTML = marks;
   const lift = $('lift'), ok = inBase || (S.lift && S.lift.state === 'ok');
-  lift.style.display = (!fight && (inBase || S.lift)) ? '' : 'none';
-  lift.setAttribute('class', 'lift ' + (ok ? 'ok' : 'broken') + (lift.classList.contains('open') ? ' open' : ''));
-  lift.querySelector('.lnum').textContent = ok ? String(S.floor) : '--';
+  lift.style.display = !fight ? '' : 'none';
+  lift.setAttribute('class', 'lift ' + (ok ? 'ok' : 'broken'));
 
   // враг
   const foe = $('foe');
   foe.style.display = fight ? '' : 'none'; $('foe-o').style.display = fight ? '' : 'none';
+  foe.style.transform = `translate(${FIGHT.fx}px,${FOE_Y}px)` + (FIGHT.dir < 0 ? ' scale(-1,1)' : ''); $('foe-o').style.transform = `translate(${FIGHT.fx}px,${FOE_Y}px)`;
   if (fight) {
     const e = S.enemy, fk = e.n + ':' + e.maxHp;
-    const bx = enemyBox(e.n);
     if (foeKey !== fk) {
       foeKey = fk;
       $('foe-art').innerHTML = ART.enemy(e.n);
-      const H = bx.h, W = bx.w, hw = W / 2;
-      const zones = [
-        ['head', -hw * .42, -H, hw * .84, H * .22], ['body', -hw * .5, -H * .78, hw, H * .34],
-        ['legs', -hw * .5, -H * .44, hw, H * .44], ['armL', -hw, -H * .8, hw * .5, H * .36], ['armR', hw * .5, -H * .8, hw * .5, H * .36],
-      ];
-      $('foe-zones').innerHTML = zones.map(([z, x, y, w, h]) =>
-        `<g><rect data-z="${z}" x="${x}" y="${y}" width="${w}" height="${h}" rx="6" class="zn"/><text data-z="${z}" x="${x + w / 2}" y="${y + h / 2 + 4}" text-anchor="middle" class="zt" pointer-events="none"></text></g>`).join('');
-      $('foe-ui').innerHTML = `<text id="fn" x="0" y="${-bx.h - 30}" text-anchor="middle" class="fname"></text><rect x="-40" y="${-bx.h - 24}" width="80" height="7" rx="3.5" fill="#0b0e13" stroke="#000" stroke-opacity=".5"/><rect id="fhp" x="-39" y="${-bx.h - 23}" width="78" height="5" rx="2.5" fill="#d9534f"/><text id="ftr" x="0" y="${-bx.h - 6}" text-anchor="middle" class="ftrait"></text>`;
+      const bx = enemyBox(e.n), H = bx.h, W = bx.w, hw = W / 2;
+      const zones = [['head', -hw * .42, -H, hw * .84, H * .22], ['body', -hw * .5, -H * .78, hw, H * .34], ['legs', -hw * .5, -H * .44, hw, H * .44], ['armL', -hw, -H * .8, hw * .5, H * .36], ['armR', hw * .5, -H * .8, hw * .5, H * .36]];
+      $('foe-zones').innerHTML = zones.map(([z, x, y, w, h]) => `<rect data-z="${z}" x="${x}" y="${y}" width="${w}" height="${h}" class="zn"/>`).join('');
     }
-    $('fn').textContent = `${e.n} ${Math.max(0, e.hp)}/${e.maxHp}`;
-    $('fhp').setAttribute('width', Math.max(0, 78 * e.hp / e.maxHp));
-    $('ftr').textContent = traitIcons(e) + (e.weak > 0 ? ' ослаблен' : '') + (e.stag > 0 ? ' шатается' : '');
-    document.querySelectorAll('#foe-zones text').forEach(t => {
-      const z = t.getAttribute('data-z');
-      t.textContent = z === 'armR' ? '' : Math.round(hitChance(z.startsWith('arm') ? 'arms' : z) * 100) + '%';
-    });
   } else { foeKey = ''; }
-  if (window.GL3D) GL3D.update({ env: inBase ? 'base' : 'z' + zone, visible: true, wi: S.wi, ai: S.ai, enemy: fight ? S.enemy.n : null, dead: S.screen === 'dead', foeX: FOE_X, foeY: FOE_Y });
+  // торговец в своей комнате
+  let npc = null, npcX = 0, npcDir = -1;
+  if (!inBase) S.rooms.forEach((r, i) => { if (r && r.type === 'trader' && r.done && !npc) { const cc = COMPS[roomComp(i)]; npc = 'trader'; npcX = leftOfHall(cc) ? cc.x0 + 70 : cc.x1 - 70; npcDir = leftOfHall(cc) ? 1 : -1; } });
+  if (window.GL3D) GL3D.update({
+    visible: true, layout: LAYOUT, floorKey: (inBase ? 'base' : 'z' + zone) + ':' + S.floor + ':' + (inBase ? '' : S.rooms.map(r => r && r.type).join(',')),
+    zone: 'z' + zone, floor: S.floor, base: inBase, rooms: S.rooms, heroComp: curComp, revealing, liftOk: ok, liftOpen,
+    wi: S.wi, ai: S.ai, enemy: fight ? S.enemy.n : null, foeX: FIGHT.fx, foeY: FOE_Y, foeDir: -FIGHT.dir, heroDir: FIGHT.dir, fight, dead: S.screen === 'dead',
+    npc: fight ? null : npc, npcX, npcDir,
+  });
 }

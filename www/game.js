@@ -344,6 +344,7 @@ function load() {
   return false;
 }
 
+let logTimer = 0;
 function log(text, cls = '') {
   const el = $('log');
   [...el.children].forEach(c => c.classList.add('old'));
@@ -352,6 +353,8 @@ function log(text, cls = '') {
   el.appendChild(p);
   while (el.children.length > 60) el.removeChild(el.firstChild);
   el.scrollTop = el.scrollHeight;
+  el.classList.add('fresh'); clearTimeout(logTimer); logTimer = setTimeout(() => el.classList.remove('fresh'), 5200);
+  if ($('radio')) $('radio').classList.add('new');
   if (cls === 'good' || (cls === 'bad' && S && S.screen !== 'fight')) toast(text.replace(/<[^>]+>/g, ''), cls);
 }
 let toastTimer = 0;
@@ -1063,51 +1066,78 @@ function dk(icon, label, fn, o = {}) {
   return b;
 }
 function renderDock() {
-  const d = $('dock'); d.innerHTML = '';
-  const row = (c = '') => { const r = document.createElement('div'); r.className = 'dock-row ' + c; d.appendChild(r); return r; };
+  const d = $('dock'); d.innerHTML = ''; d.className = '';
   const go = sc => () => { S.screen = sc; render(); };
+  const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+  const bag = el('button', 'bag', ico('bag')); bag.title = 'Рюкзак'; bag.onclick = () => { sfx('click'); S.screen = 'inv'; render(); };
   if (S.screen === 'fight' && S.enemy) {
-    const r1 = row();
-    Object.keys(PARTS).forEach(k => {
-      const g = dmgRange(k);
-      r1.appendChild(dk(bodyIcon(k), PARTS[k].n, () => attack(k), { cls: 'part primary', sub: `${Math.round(hitChance(k) * 100)}% · ${g[0]}–${g[1]}` }));
-    });
-    const r2 = row('scroll');
-    r2.appendChild(dk('🛡', 'Защита', defend));
-    r2.appendChild(dk('🏃', 'Бежать', flee, { disabled: S.passive === 'rush' }));
-    r2.appendChild(dk('💣', 'Граната', throwGrenade, { badge: S.grenade || '', disabled: S.grenade <= 0 }));
-    r2.appendChild(dk('🍖', 'Паёк', () => useItem('food'), { badge: S.food || '', disabled: S.food <= 0 || S.en >= S.maxEn }));
-    r2.appendChild(dk('🩹', 'Бинт', () => useItem('meds'), { badge: S.meds || '', disabled: S.meds <= 0 || (S.hp >= S.maxHp && !S.bleed) }));
-    r2.appendChild(dk('💉', 'Аптечка', () => useItem('medkit'), { badge: S.medkit || '', disabled: S.medkit <= 0 || (S.hp >= S.maxHp && !S.poison && !S.bleed) }));
-    r2.appendChild(dk('⚡', 'Стим', () => useItem('stim'), { badge: S.stim || '', disabled: S.stim <= 0 || S.en >= S.maxEn }));
-    r2.appendChild(dk('🍲', 'Блюда', openMeals, { badge: totalDishes() || '', disabled: totalDishes() === 0 }));
-    const ap = ACTIVES.find(x => x.id === S.active);
-    if (ap) r2.appendChild(dk('✨', ap.n, useActive, { disabled: S.activeUsed }));
-  } else if (S.screen === 'map') {
-    const r = row();
-    r.appendChild(dk('🎒', 'Рюкзак', go('inv')));
+    d.className = 'fight';
+    // панель оружия | кнопка прицела | быстрые предметы — как в Skyhill
+    const w = weapon(), g = dmgRange('body');
+    const wp = el('div', 'wpanel', `<canvas class="wico" width="132" height="66"></canvas><div class="wtx"><b>${w.n}</b><small>Урон ${g[0]}–${g[1]}</small></div>`);
+    d.appendChild(wp); if (window.GL3D && GL3D.drawWeapon) GL3D.drawWeapon(wp.querySelector('canvas'), S.wi);
+    const aim = el('button', 'aimbtn', ico('target')); aim.title = 'Выбрать цель'; aim.onclick = () => { sfx('click'); openAim(); }; d.appendChild(aim);
+    const q = el('div', 'quick');
+    const qb = (icon, label, fn, n, dis) => { const b = dk(icon, label, fn, { badge: n || '', disabled: dis }); q.appendChild(b); };
+    qb('🛡', 'Защита', defend); qb('🏃', 'Бежать', flee, 0, S.passive === 'rush');
+    qb('💣', 'Граната', throwGrenade, S.grenade, S.grenade <= 0);
+    qb('🍖', 'Паёк', () => useItem('food'), S.food, S.food <= 0 || S.en >= S.maxEn);
+    qb('🩹', 'Бинт', () => useItem('meds'), S.meds, S.meds <= 0 || (S.hp >= S.maxHp && !S.bleed));
+    qb('💉', 'Аптечка', () => useItem('medkit'), S.medkit, S.medkit <= 0 || (S.hp >= S.maxHp && !S.poison && !S.bleed));
+    qb('⚡', 'Стим', () => useItem('stim'), S.stim, S.stim <= 0 || S.en >= S.maxEn);
+    if (totalDishes() > 0) qb('🍲', 'Блюда', openMeals, totalDishes());
+    const ap = ACTIVES.find(x => x.id === S.active); if (ap) qb('✨', ap.n, useActive, 0, S.activeUsed);
+    d.appendChild(q);
+    return;
+  }
+  if (S.screen !== 'map' && S.screen !== 'base') return;
+  d.appendChild(bag);
+  const r = el('div', 'tools');
+  if (S.screen === 'map') {
     r.appendChild(dk('🛠', 'Верстак', go('craft')));
     r.appendChild(dk('⭐', 'Навыки', go('skills'), { cls: S.sp ? 'primary' : '', badge: S.sp || '' }));
     r.appendChild(dk('📖', 'Дневник', go('diary')));
     r.appendChild(dk('🏆', 'Награды', go('ach')));
     if (S.lift && S.lift.state === 'ok' && S.floor >= 3) r.appendChild(dk('🏠', 'Убежище', goBase));
     r.appendChild(dk('❓', 'Справка', () => { S.helpFrom = 'map'; S.screen = 'help'; render(); }));
-  } else if (S.screen === 'base') {
-    const r = row();
+  } else {
     r.appendChild(dk('🛏', 'Спать', sleep, { cls: 'primary', disabled: S.en < 6 }));
     r.appendChild(dk('🍳', 'Кухня', go('kitchen')));
     r.appendChild(dk('🛠', 'Верстак', go('craft')));
-    r.appendChild(dk('🎒', 'Рюкзак', go('inv')));
     r.appendChild(dk('⭐', 'Навыки', go('skills'), { cls: S.sp ? 'primary' : '', badge: S.sp || '' }));
     r.appendChild(dk('⬆', 'Наверх', returnUp, { cls: 'primary' }));
   }
+  d.appendChild(r);
 }
+// ---------- выбор цели: враг целиком, нужная часть тела подсвечена ----------
+function openAim() {
+  if (S.screen !== 'fight' || !S.enemy) return;
+  const row = $('aim-row'); row.innerHTML = '';
+  const who = { name: S.enemy.n };
+  Object.keys(PARTS).forEach(k => {
+    const g = dmgRange(k), b = document.createElement('button'); b.className = 'tgt';
+    b.innerHTML = `<canvas width="220" height="300"></canvas><b>${Math.round(hitChance(k) * 100)}%</b><small>${PARTS[k].n} · урон ${g[0]}–${g[1]}</small>`;
+    b.onclick = () => { closeAim(); sfx('click'); attack(k); };
+    row.appendChild(b);
+    if (window.GL3D && GL3D.drawChar) GL3D.drawChar(b.querySelector('canvas'), who, 'full', k);
+  });
+  $('aim').classList.add('open');
+}
+function closeAim() { $('aim').classList.remove('open'); }
 function layoutUI() {
   const sc = S.screen, perk = sc === 'map' && S.pendingPerks > 0;
   const full = ['start', 'help', 'settings', 'transfer'].includes(sc);
   const sheet = perk || full || !!SHEET_TITLES[sc];
   $('sheet').classList.toggle('open', sheet); $('sheet').classList.toggle('full', full);
-  $('sheet-title').textContent = perk ? 'Новый уровень!' : (SHEET_TITLES[sc] || '');
+  const tabs = ['inv', 'craft', 'skills', 'diary', 'ach'];
+  if (!perk && tabs.includes(sc)) {
+    const back = S.inBase ? 'base' : 'map';
+    $('sheet-title').innerHTML = '<div class="tabs">' + tabs.map(t => `<button data-t="${t}" class="${t === sc ? 'on' : ''}">${SHEET_TITLES[t]}</button>`).join('') + `</div><button class="x" data-t="${back}">${ico('close')}</button>`;
+    $('sheet-title').querySelectorAll('button').forEach(b => b.onclick = () => { sfx('click'); S.screen = b.dataset.t; render(); });
+  } else $('sheet-title').textContent = perk ? 'Новый уровень!' : (SHEET_TITLES[sc] || '');
+  $('sheet').classList.toggle('tabbed', !perk && tabs.includes(sc));
+  if (sc !== 'fight') closeAim();
+  $('actions').className = sc === 'inv' && !perk ? 'inv-l' : '';
   $('dock').style.display = sheet ? 'none' : '';
   $('btn-hl').classList.toggle('on', $('sv').classList.contains('hl'));
   $('btn-fast').classList.toggle('on', walkMs < 400);
@@ -1120,6 +1150,22 @@ function slotBtn(icon, name, count, fn, disabled, mat) {
   return b;
 }
 
+let pfKey = '', peKey = '';
+function drawPortraits() {
+  if (!window.GL3D || !GL3D.drawChar) return;
+  const hk = S.wi + ':' + S.ai;
+  if (hk !== pfKey) { pfKey = hk; GL3D.drawChar($('pf-c'), { hero: true, wi: S.wi, ai: S.ai }, 'portrait'); }
+  const fight = S.screen === 'fight' && S.enemy;
+  $('foe-hud').classList.toggle('on', !!fight);
+  if (fight) {
+    const e = S.enemy;
+    if (peKey !== e.n) { peKey = e.n; GL3D.drawChar($('pe-c'), { name: e.n }, 'portrait'); }
+    $('foe-hp').innerHTML = `${Math.max(0, e.hp)}<small>/${e.maxHp}</small>`;
+    $('b-fhp').style.width = Math.max(0, e.hp / e.maxHp * 100) + '%';
+    $('foe-name').textContent = e.n;
+    $('foe-tr').textContent = traitIcons(e) + (e.weak > 0 ? ' ослаблен' : '') + (e.stag > 0 ? ' шатается' : '');
+  } else peKey = '';
+}
 function render() {
   checkAch();
   $('floor').innerHTML = S.inBase ? '<b class="word">Убежище</b>' : `<small>этаж</small><b>${S.floor}</b><i>/${TOP}</i>`;
@@ -1131,6 +1177,7 @@ function render() {
   $('t-en').innerHTML = `${S.en}<small>/${S.maxEn}</small>`;
   $('hud-l').classList.toggle('low', S.hp <= S.maxHp * .3); $('hud-l').classList.toggle('starve', S.en <= S.maxEn * .2);
   $('lvl').textContent = S.lvl;
+  drawPortraits();
   $('t-xp').textContent = `${S.xp}/${S.lvl * 20}`;
   $('quest').innerHTML = S.quest ? `${ico('phone')} до этажа ${S.quest.floor}` : '';
   $('inv').innerHTML =
@@ -1151,6 +1198,13 @@ function render() {
       }
       break;
     case 'inv': {
+      // карточка персонажа: фигура в снаряжении и характеристики
+      const card = document.createElement('div'); card.className = 'card';
+      card.innerHTML = `<canvas width="180" height="270"></canvas><div class="cst"><b>Выживший · ур. ${S.lvl}</b>` +
+        Object.keys(SK).map(k => `<div><span>${SK[k]}</span><i>${S.skills[k]}</i></div>`).join('') +
+        `<div><span>Здоровье</span><i>${S.hp}/${S.maxHp}</i></div><div><span>Сытость</span><i>${S.en}/${S.maxEn}</i></div><div><span>Опыт</span><i>${S.xp}/${S.lvl * 20}</i></div></div>`;
+      a.appendChild(card);
+      if (window.GL3D && GL3D.drawChar) GL3D.drawChar(card.querySelector('canvas'), { hero: true, wi: S.wi, ai: S.ai }, 'full');
       const eq = document.createElement('div'); eq.className = 'eq';
       eq.innerHTML = `<div><b>⚔️ ${weapon().n}</b><small>урон +${weapon().d} · навык «${SK[WEAPON_SKILL[S.wi]]}»</small></div><div><b>🛡️ ${armor().n}</b><small>защита ${defArmor()}</small></div>`;
       a.appendChild(eq);
@@ -1358,6 +1412,9 @@ try {
 initScene();
 $('btn-hl').innerHTML = ico('eye'); $('btn-fast').innerHTML = ico('fast'); $('btn-set').innerHTML = ico('gear'); $('i-hp').innerHTML = ico('heart'); $('i-en').innerHTML = ico('hunger');
 $('log').onclick = () => $('log').classList.toggle('open');
+$('radio').innerHTML = ico('radio'); $('radio').onclick = () => { sfx('click'); $('radio').classList.remove('new'); $('log').classList.toggle('open'); };
+$('aim-x').innerHTML = ico('close'); $('aim-x').onclick = () => { sfx('click'); closeAim(); }; $('aim').onclick = ev => { if (ev.target.id === 'aim') closeAim(); };
+$('i-fhp').innerHTML = ico('heart');
 $('btn-hl').onclick = () => { $('sv').classList.toggle('hl'); render(); };
 $('btn-fast').onclick = () => { walkMs = walkMs < 400 ? 520 : 260; try { localStorage.setItem('tower-fast', walkMs < 400 ? '1' : '0'); } catch (e) {} render(); };
 $('btn-set').onclick = () => { if (['map', 'base', 'start'].includes(S.screen)) openSettings(); };

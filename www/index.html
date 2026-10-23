@@ -13,20 +13,29 @@
     <canvas id="gl"></canvas>
     <svg id="ov" viewBox="0 24 360 400" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg"></svg>
     <div id="hud">
-      <div id="hud-l" class="ink">
-        <div class="stat hp"><span class="si" id="i-hp"></span><b id="t-hp"></b><div class="track"><div class="fill hp" id="b-hp"></div></div></div>
-        <div class="stat en"><span class="si" id="i-en"></span><b id="t-en"></b><div class="track"><div class="fill en" id="b-en"></div></div></div>
-        <div class="stat xp"><span class="lv" id="lvl"></span><div class="track"><div class="fill xp" id="b-xp"></div></div><span id="t-xp"></span></div>
+      <div id="hud-l">
+        <div id="pf" class="portrait"><canvas id="pf-c" width="144" height="144"></canvas><span class="lv" id="lvl"></span></div>
+        <div class="vit">
+          <div class="stat hp"><b id="t-hp"></b><span class="si" id="i-hp"></span><div class="track"><div class="fill hp" id="b-hp"></div></div></div>
+          <div class="stat en"><b id="t-en"></b><span class="si" id="i-en"></span><div class="track"><div class="fill en" id="b-en"></div></div></div>
+          <div class="track xp"><div class="fill xp" id="b-xp"></div></div><span id="t-xp"></span>
+          <div id="inv"></div>
+        </div>
       </div>
+      <div id="sign"><div id="floor"></div><div id="zone"></div><div id="quest"></div></div>
       <div id="hud-r">
-        <div id="sign" class="ink"><div id="floor"></div><div id="zone"></div><div id="quest"></div></div>
         <div id="hud-btns">
-          <button id="btn-hl" title="Подсветить предметы">👁</button><button id="btn-fast" title="Быстрая ходьба">⏩</button><button id="mute" title="Звук">🔊</button><button id="btn-set" title="Настройки">⚙</button>
+          <button id="btn-hl" title="Подсветить предметы"></button><button id="btn-fast" title="Быстрая ходьба"></button><button id="mute" title="Звук"></button><button id="btn-set" title="Настройки"></button>
+        </div>
+        <div id="foe-hud">
+          <div class="vit"><div class="stat hp"><b id="foe-hp"></b><span class="si" id="i-fhp"></span><div class="track"><div class="fill hp" id="b-fhp"></div></div></div><div id="foe-name"></div><div id="foe-tr"></div></div>
+          <div class="portrait foe"><canvas id="pe-c" width="144" height="144"></canvas></div>
         </div>
       </div>
     </div>
+    <button id="radio" title="Журнал"></button>
     <div id="toast"></div>
-    <div id="inv"></div>
+    <div id="aim"><div id="aim-row"></div><button id="aim-x" title="Закрыть"></button></div>
   </div>
   <div id="bottom"><div id="log"></div><div id="dock"></div></div>
 </div>

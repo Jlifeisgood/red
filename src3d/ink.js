@@ -2,7 +2,9 @@
 // Всё рисуется на canvas в единицах сцены (масштаб PX пикселей на единицу), y — вниз, персонаж смотрит вправо (+x).
 import * as THREE from 'three';
 
-export const PX = 4, PAD = 3, INK = '#0b0a0c', PI = Math.PI;
+export const PX = 4, PAD = 3, INK = '#141114', PI = Math.PI;
+// плоский векторный стиль (как в Skyhill): тонкий тёмный контур, тень без штриховки, лёгкая фактура
+export const STYLE = { ink: .5, hatch: false, grit: .45 };
 
 // ---------- цвет ----------
 const RGB = h => { const n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
@@ -44,7 +46,7 @@ export function cel(ctx, P, base, o = {}) {
   const M = ctx.getTransform();
   ctx.save(); ctx.clip(P);
   ctx.fillStyle = dark; ctx.fillRect(-BIG, -BIG, BIG * 2, BIG * 2);
-  if (o.hatch !== false) { HATCH = HATCH || hatchCanvas(); ctx.globalAlpha = o.hatchA || .3; ctx.fillStyle = pat(ctx, HATCH, .32); ctx.fillRect(-BIG, -BIG, BIG * 2, BIG * 2); ctx.globalAlpha = 1; }
+  if (o.hatch === true || (STYLE.hatch && o.hatch !== false)) { HATCH = HATCH || hatchCanvas(); ctx.globalAlpha = o.hatchA || .3; ctx.fillStyle = pat(ctx, HATCH, .32); ctx.fillRect(-BIG, -BIG, BIG * 2, BIG * 2); ctx.globalAlpha = 1; }
   ctx.translate(s, -s * .8); ctx.clip(P); ctx.setTransform(M);
   ctx.fillStyle = lite; ctx.fillRect(-BIG, -BIG, BIG * 2, BIG * 2);
   ctx.translate(-h, h); ctx.clip(P); ctx.setTransform(M);
@@ -55,9 +57,9 @@ export function cel(ctx, P, base, o = {}) {
 export function celIn(ctx, P, region, base, o) { ctx.save(); ctx.clip(region); cel(ctx, P, base, o); ctx.restore(); }
 export function grit(ctx, P, a = .28) {
   GRIT = GRIT || gritCanvas();
-  ctx.save(); ctx.clip(P); ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = a; ctx.fillStyle = pat(ctx, GRIT, .22); ctx.fillRect(-BIG, -BIG, BIG * 2, BIG * 2); ctx.restore();
+  ctx.save(); ctx.clip(P); ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = a * STYLE.grit; ctx.fillStyle = pat(ctx, GRIT, .22); ctx.fillRect(-BIG, -BIG, BIG * 2, BIG * 2); ctx.restore();
 }
-export function ink(ctx, P, w = 1.5, col = INK) { ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.strokeStyle = col; ctx.lineWidth = w; ctx.stroke(P); ctx.restore(); }
+export function ink(ctx, P, w = 1.5, col = INK) { ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.strokeStyle = col; ctx.lineWidth = w * STYLE.ink; ctx.globalAlpha = .9; ctx.stroke(P); ctx.restore(); }
 export function line(ctx, pts, w = .9, col = INK, a = 1) {
   ctx.save(); ctx.globalAlpha = a; ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath();
   ctx.moveTo(pts[0], pts[1]);

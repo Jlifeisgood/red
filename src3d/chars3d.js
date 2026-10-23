@@ -1,8 +1,7 @@
-// Сцена: 3D-окружение башни + рисованные 2D-персонажи (герой, зомби, звери), свет, тени, пост-обработка.
-import { buildEnv, FY } from './env3d.js';
+// Сцена в духе Skyhill: здание в разрезе (building.js) и рисованные 2D-персонажи (rig2d.js) с тенями на стене; WebGL + пост-обработка.
+import { buildBuilding } from './building.js';
 import { makePost } from './post.js';
 import * as THREE from 'three';
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { buildHuman2D, buildQuad2D } from './rig2d.js';
 
 const GL = { ready: false, enabled: true, active: false };
@@ -17,7 +16,6 @@ GL.box = (name) => {
   return { h: 134 * HUMAN_SCALE * s, w: (c.style === 'brute' ? 100 : c.style === 'bloater' ? 86 : 72) * s };
 };
 
-const VB = { x: 0, y: 24, w: 360, h: 400 };
 const HUMAN_SCALE = 1.05;
 
 // ---------- внешность ----------
@@ -77,6 +75,10 @@ function heroModel(wi, ai) {
   m.group.scale.setScalar(HUMAN_SCALE); m.cfg = cfg;
   return m;
 }
+function npcModel(kind) {
+  const cfg = { style: 'hero', zombie: false, seed: 77, skin: '#b88a6a', shirt: '#5a4a6a', jacket: '#4a3a2a', pants: '#2c2c30', shoes: '#1d1a18', hair: '#8a8a8a', stubble: true, sleeves: 'long', torn: .1, blood: 0, x: ['pack'] };
+  const m = buildHuman2D(cfg, 0); m.group.scale.setScalar(HUMAN_SCALE); m.cfg = cfg; return m;
+}
 function enemyModel(name) {
   const cfg = Object.assign({ zombie: true, seed: hashName(name) }, ZOMBIES[name] || ZOMBIES['Сборщик']);
   if (cfg.coat) cfg.coatCol = cfg.shirt;
@@ -87,66 +89,55 @@ function enemyModel(name) {
 }
 
 // ---------- сцена ----------
-let renderer, scene, camera, canvas, hostEl, pmrem, post = null;
-let env = null, envKey = '', keyLight = null, hurt = 0;
-let hero = null, foe = null, dying = [], heroKey = '', foeKey = '', view = '', lastDraw = 0;
-// качество: high — HDR, MSAA, свечение, цветокоррекция, тени; low — прямой рендер без теней
+let renderer, scene, camera, canvas, hostEl, post = null;
+let bld = null, bldKey = '', hurt = 0, lastState = null;
+let hero = null, foe = null, npc = null, dying = [], heroKey = '', foeKey = '', npcKey = '', view = '', lastDraw = 0;
 GL.quality = 'high';
 try { GL.quality = localStorage.getItem('tower-q') || 'high'; } catch (e) {}
 
-function shadowTex() {
-  const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
-  const g = x.createRadialGradient(32, 32, 2, 32, 32, 30); g.addColorStop(0, 'rgba(0,0,0,.75)'); g.addColorStop(.5, 'rgba(0,0,0,.35)'); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64);
-  return new THREE.CanvasTexture(c);
-}
-let SHT = null;
-function holder(model, w) {
+// тень персонажа на задней стене: тот же силуэт, крупнее и со сдвигом влево-вверх (свет снизу-справа)
+const SH_DX = -16, SH_DY = 3, SH_K = 1.12;
+function holder(model) {
   const root = new THREE.Group(), flip = new THREE.Group(), yaw = new THREE.Group();
   root.add(flip); flip.add(yaw); yaw.add(model.group);
-  SHT = SHT || shadowTex();
-  // мягкая контактная тень под ногами (дополняет карту теней)
-  const sh = new THREE.Mesh(new THREE.PlaneGeometry(w * 2.2, w * 1.3), new THREE.MeshBasicMaterial({ map: SHT, transparent: true, depthWrite: false }));
-  sh.rotation.x = -Math.PI / 2; sh.position.set(0, .6, 0); sh.renderOrder = 1; root.add(sh);
-  return { root, flip, yaw, model, ctl: model.ctl, st: { atk: -1, flash: 0, dir: 1, pop: 0 } };
+  const sh = new THREE.Group(), sflip = new THREE.Group(), syaw = new THREE.Group();
+  sh.position.set(SH_DX, SH_DY, -9.3); sh.scale.setScalar(SH_K); root.add(sh); sh.add(sflip); sflip.add(syaw); syaw.add(model.shadow);
+  return { root, flip, yaw, sflip, syaw, model, ctl: model.ctl, st: { atk: -1, flash: 0, dir: 1, pop: 0 } };
 }
-function setFlash(h, f) { h.model.mats.forEach(m => { if (m.userData.glow) return; const b = m.userData.baseEmissive || 0; m.emissive.setRGB(b + f * 1.6, b * (1 - f * .7), b * (1 - f * .75)); }); }
-const animate = (h, dt) => h.model.apply(h.ctl.pose(dt));
+function face(h, dir) { h.st.dir = dir; h.flip.scale.x = dir; h.sflip.scale.x = dir; }
+function setTint(h, f, light) {
+  h.model.mats.forEach(m => { if (m.userData.glow) return; m.color.setRGB(light * (1 + f * 1.5), light * (1 - f * .45), light * (1 - f * .5)); });
+}
 function disposeHolder(h) {
   if (!h) return; scene.remove(h.root);
   h.root.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) [].concat(o.material).forEach(m => m.dispose()); });
 }
+const animate = (h, dt) => h.model.apply(h.ctl.pose(dt));
 
-function applyQuality() {
-  const hi = GL.quality !== 'low';
-  renderer.shadowMap.enabled = hi; renderer.shadowMap.needsUpdate = true;
-  if (keyLight) keyLight.castShadow = hi;
-  scene.traverse(o => { if (o.material) [].concat(o.material).forEach(m => { m.needsUpdate = true; }); });
-  if (hi && !post) post = makePost(renderer, scene, camera);
-  view = '';
-}
 function setupView() {
   const r = hostEl.getBoundingClientRect(), W = Math.max(1, r.width), H = Math.max(1, r.height);
   const key = W + 'x' + H;
   if (key !== view) {
     view = key;
-    const hi = GL.quality !== 'low', pr = Math.min(window.devicePixelRatio || 1, hi ? 1.6 : 1.1);
+    const hi = GL.quality !== 'low', pr = Math.min(window.devicePixelRatio || 1, hi ? 1.75 : 1.2);
     renderer.setPixelRatio(pr); renderer.setSize(W, H, false);
     if (hi && post) post.setSize(W, H, pr);
   }
   // окно мира задаёт камера сцены (scene.js): SVG-слои и WebGL видят одно и то же
-  const V = window.VIEW || VB, D = 1100, cx = V.x + V.w / 2, cy = -(V.y + V.h / 2);
-  camera.fov = 2 * Math.atan(V.h / 2 / D) * 180 / Math.PI; camera.aspect = W / H; camera.near = 50; camera.far = 3000;
-  camera.position.set(cx, cy, D); camera.lookAt(cx, cy, 0); camera.updateProjectionMatrix();
+  const V = window.VIEW || { x: 0, y: 0, w: 900, h: 400 };
+  camera.left = V.x; camera.right = V.x + V.w; camera.top = -V.y; camera.bottom = -(V.y + V.h); camera.updateProjectionMatrix();
 }
 function trackHero() {
   const el = document.getElementById('hero'); if (!el || !hero) return;
-  const cs = getComputedStyle(el); let x = 0, y = 352;
+  const cs = getComputedStyle(el); let x = 0, y = 400;
   if (cs.transform && cs.transform !== 'none') { const m = new DOMMatrix(cs.transform); x = m.m41; y = m.m42; }
   hero.root.position.set(x, -y, 0);
-  const left = el.classList.contains('face-l'); hero.flip.scale.x = left ? -1 : 1; hero.st.dir = left ? -1 : 1;
+  if (!lastState || !lastState.fight) face(hero, el.classList.contains('face-l') ? -1 : 1);
   hero.ctl.loop(el.classList.contains('walk') ? 'walk' : 'idle');
   hero.root.visible = !el.classList.contains('boarding');
 }
+// свет отсека, где стоит персонаж: тёмные неизведанные комнаты приглушают и героя
+function lightAt(x) { return 1; }
 function frame(ts) {
   requestAnimationFrame(frame);
   if (!GL.active || !renderer) return;
@@ -157,49 +148,55 @@ function frame(ts) {
   if (hero) {
     trackHero(); const s = hero.st;
     if (s.atk >= 0) { s.atk += dt / .55; if (s.atk >= 1) s.atk = -1; }
-    if (s.flash > 0) s.flash = Math.max(0, s.flash - dt * 3); setFlash(hero, s.flash);
-    hero.yaw.position.x = s.atk >= 0 ? Math.sin(Math.PI * Math.min(1, s.atk * 1.4)) * 38 : 0;
+    if (s.flash > 0) s.flash = Math.max(0, s.flash - dt * 3); setTint(hero, s.flash, 1);
+    hero.yaw.position.x = hero.syaw.position.x = s.atk >= 0 ? Math.sin(Math.PI * Math.min(1, s.atk * 1.4)) * 30 : 0;
     animate(hero, dt);
   }
-  if (foe) {
-    const s = foe.st; s.pop = Math.min(1, s.pop + dt * 4);
+  for (const h of [foe, npc]) {
+    if (!h) continue;
+    const s = h.st; s.pop = Math.min(1, s.pop + dt * 4);
     if (s.atk >= 0) { s.atk += dt / .6; if (s.atk >= 1) s.atk = -1; }
-    if (s.flash > 0) s.flash = Math.max(0, s.flash - dt * 3); setFlash(foe, s.flash);
-    foe.yaw.position.x = s.atk >= 0 ? Math.sin(Math.PI * s.atk) * 40 : 0;
-    const k = 1 - Math.pow(1 - s.pop, 3); foe.root.scale.set(k, k, k);
-    animate(foe, dt);
+    if (s.flash > 0) s.flash = Math.max(0, s.flash - dt * 3); setTint(h, s.flash, 1);
+    h.yaw.position.x = h.syaw.position.x = s.atk >= 0 ? Math.sin(Math.PI * s.atk) * 34 : 0;
+    const k = 1 - Math.pow(1 - s.pop, 3); h.root.scale.set(k, k, k);
+    animate(h, dt);
   }
   dying = dying.filter(d => {
     animate(d, dt); d.left -= dt;
-    if (d.left < .4) d.root.traverse(o => { if (o.material) [].concat(o.material).forEach(m => { m.transparent = true; m.opacity = Math.max(0, d.left / .4); }); });
+    if (d.left < .4) d.root.traverse(o => { if (o.material) [].concat(o.material).forEach(m => { m.transparent = true; m.opacity = Math.max(0, d.left / .4) * (m.userData.op0 == null ? (m.userData.op0 = m.opacity) : m.userData.op0); }); });
     if (d.left <= 0) { disposeHolder(d); return false; } return true;
   });
-  if (env) env.update(dt, [0, 1, 2].map(i => document.getElementById('door' + i)), document.getElementById('lift'));
-  if (keyLight) { const hx = hero ? hero.root.position.x : 180; keyLight.position.set(hx - 70, FY + 520, 420); keyLight.target.position.set(hx + 20, FY, 0); keyLight.target.updateMatrixWorld(); }
+  if (bld && lastState) bld.update(dt, lastState);
   hurt = Math.max(0, hurt - dt * 1.6);
   if (GL.quality !== 'low' && post) post.render(t, hurt); else renderer.render(scene, camera);
 }
+// o: { visible, layout, floorKey, zone, floor, base, rooms, heroComp, revealing, liftOk, liftOpen, wi, ai, enemy, foeX, foeDir, fight, dead, npc, npcX }
 GL.update = (o) => {
   if (!GL.ready) return;
   GL.active = !!o.visible && GL.enabled; canvas.style.display = GL.active ? '' : 'none';
   if (!GL.active) return;
-  if (o.env !== envKey) {
-    envKey = o.env || '';
-    if (env) { scene.remove(env.root); env.dispose(); env = null; }
-    if (envKey) { try { env = buildEnv(envKey); scene.add(env.root); } catch (e) { console.error(e); env = null; } }
+  lastState = o;
+  if (o.floorKey !== bldKey) {
+    bldKey = o.floorKey;
+    if (bld) { scene.remove(bld.root); bld.dispose(); bld = null; }
+    try { bld = buildBuilding({ zone: o.zone, floor: o.floor, base: o.base, rooms: o.rooms }, o.layout); scene.add(bld.root); } catch (e) { console.error(e); bld = null; }
   }
-  hostEl.classList.toggle('env', !!env);
+  hostEl.classList.toggle('env', !!bld);
   const hk = o.wi + ':' + o.ai;
-  if (hk !== heroKey) { heroKey = hk; disposeHolder(hero); const m = heroModel(o.wi, o.ai); hero = holder(m, 22); scene.add(hero.root); }
-  if (hero) { if (o.dead) hero.ctl.once('death'); else if (hero.ctl.dead) hero.ctl.reset(); }
+  if (hk !== heroKey) { heroKey = hk; disposeHolder(hero); hero = holder(heroModel(o.wi, o.ai)); scene.add(hero.root); }
+  if (hero) { if (o.dead) hero.ctl.once('death'); else if (hero.ctl.dead) hero.ctl.reset(); if (o.fight) face(hero, o.heroDir || 1); }
   const fk = o.enemy || '';
   if (fk !== foeKey) {
     foeKey = fk;
     if (foe) { if (foe.dyingStarted) { foe.left = 1.5; dying.push(foe); } else disposeHolder(foe); }
     foe = null;
-    if (fk) { const m = enemyModel(fk); foe = holder(m, m.cfg.q ? 36 * (m.cfg.scale || 1) : 28); foe.flip.scale.x = -1; foe.st.dir = -1; foe.root.scale.set(0, 0, 0); scene.add(foe.root); }
+    if (fk) { foe = holder(enemyModel(fk)); foe.root.scale.set(0, 0, 0); scene.add(foe.root); }
   }
-  if (foe) foe.root.position.set(o.foeX, -o.foeY, 0);
+  if (foe) { foe.root.position.set(o.foeX, -o.foeY, 0); face(foe, o.foeDir || -1); }
+  // мирный житель/торговец в комнате
+  const nk = o.npc || '';
+  if (nk !== npcKey) { npcKey = nk; disposeHolder(npc); npc = null; if (nk) { npc = holder(npcModel(nk)); npc.st.pop = 1; scene.add(npc.root); } }
+  if (npc) { npc.root.position.set(o.npcX, -o.foeY, 0); face(npc, o.npcDir || -1); }
 };
 GL.setEnabled = (v) => {
   GL.enabled = !!v;
@@ -210,7 +207,7 @@ GL.setEnabled = (v) => {
 GL.setQuality = (q) => {
   GL.quality = q === 'low' ? 'low' : 'high';
   try { localStorage.setItem('tower-q', GL.quality); } catch (e) {}
-  if (renderer) applyQuality();
+  if (renderer) { if (GL.quality !== 'low' && !post) post = makePost(renderer, scene, camera); view = ''; }
 };
 GL.trigger = (who, kind) => {
   if (!GL.ready || !GL.enabled) return;
@@ -219,17 +216,7 @@ GL.trigger = (who, kind) => {
   else if (kind === 'hurt') { h.st.flash = 1; h.ctl.once('hit'); if (who === 'hero') hurt = 1; }
   else if (kind === 'death') { h.dyingStarted = true; h.ctl.once('death'); }
 };
-function lights(sc) {
-  sc.add(new THREE.HemisphereLight(0x8f9cb8, 0x2a2018, .65));
-  // ключевой тёплый свет сверху-спереди: тени персонажей на пол и стену
-  const key = new THREE.DirectionalLight(0xffdcb0, 1.9); key.position.set(-140, 260, 320); sc.add(key, key.target);
-  key.castShadow = true; key.shadow.mapSize.set(1024, 1024); key.shadow.bias = -.0005; key.shadow.normalBias = .8; key.shadow.radius = 4;
-  Object.assign(key.shadow.camera, { left: -260, right: 260, top: 300, bottom: -200, near: 100, far: 1500 }); keyLight = key;
-  // холодный контровой свет: читаемый силуэт на тёмном фоне
-  const rim = new THREE.DirectionalLight(0x8cb4ff, 2.6); rim.position.set(240, 160, -300); sc.add(rim);
-  const rim2 = new THREE.DirectionalLight(0xffb27a, .9); rim2.position.set(-260, 80, -200); sc.add(rim2);
-}
-function setupRenderer(r) { r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFShadowMap; r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.1; }
+function setupRenderer(r) { r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.NoToneMapping; }
 GL.init = () => {
   try {
     hostEl = document.getElementById('scene'); canvas = document.getElementById('gl');
@@ -237,24 +224,78 @@ GL.init = () => {
     renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
     renderer.setClearColor(0x050608, 1); setupRenderer(renderer);
     scene = new THREE.Scene();
-    pmrem = new THREE.PMREMGenerator(renderer); scene.environment = pmrem.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .35;
-    camera = new THREE.PerspectiveCamera(30, .9, 50, 3000);
-    lights(scene);
-    applyQuality();
+    camera = new THREE.OrthographicCamera(0, 900, 0, -400, -200, 200); camera.position.z = 100;
+    if (GL.quality !== 'low') post = makePost(renderer, scene, camera);
     GL.ready = true; if (GL.enabled) hostEl.classList.add('gl');
     requestAnimationFrame(frame);
     if (typeof render === 'function') render();
   } catch (e) { console.error(e); GL.ready = false; if (hostEl) hostEl.classList.remove('gl'); }
 };
-// отладка и тесты: несколько моделей на отдельном холсте, в нужной анимации и моменте
+
+// ---------- рисование персонажа на 2D-холсте (портреты HUD, выбор цели) ----------
+// region: 'head' | 'body' | 'arms' | 'legs' — подсветить часть тела красным
+const REGION = { head: ['head'], body: ['torso', 'coatTail', 'body'], arms: ['uarmN', 'farmN', 'handN', 'uarmF', 'farmF', 'handF', 'fuN', 'flN', 'fuF', 'flF'], legs: ['thighN', 'shinN', 'footN', 'thighF', 'shinF', 'footF', 'huN', 'hlN', 'huF', 'hlF', 'tail'] };
+function drawModel(ctx, m, s, ox, oy, region, dim) {
+  m.group.updateMatrixWorld(true);
+  const list = []; m.group.traverse(o => { if (o.isMesh && o.material.map && !o.material.userData.glow) list.push(o); });
+  list.sort((a, b) => a.renderOrder - b.renderOrder);
+  const hl = region ? new Set(REGION[region] || []) : null;
+  for (const o of list) {
+    const e = o.matrixWorld.elements, img = o.material.map.image, w = o.geometry.parameters.width, h = o.geometry.parameters.height;
+    ctx.setTransform(s * e[0], -s * e[1], -s * e[4], s * e[5], s * e[12] + ox, -s * e[13] + oy);
+    if (hl && hl.has(o.userData.part)) {
+      const tc = document.createElement('canvas'); tc.width = img.width; tc.height = img.height; const tx = tc.getContext('2d');
+      tx.drawImage(img, 0, 0); tx.globalCompositeOperation = 'source-atop'; tx.fillStyle = 'rgba(214,28,20,.82)'; tx.fillRect(0, 0, tc.width, tc.height);
+      ctx.drawImage(tc, -w / 2, -h / 2, w, h);
+    } else { ctx.globalAlpha = dim && hl ? .9 : 1; ctx.drawImage(img, -w / 2, -h / 2, w, h); ctx.globalAlpha = 1; }
+  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+}
+// Рисует героя/врага в холст cv: mode 'portrait' (голова крупно) или 'full' (весь рост, подсветка region)
+GL.drawChar = (cv, who, mode, region) => {
+  if (!GL.ready && mode !== 'full' && mode !== 'portrait') return false;
+  const m = who.hero ? heroModel(who.wi, who.ai) : enemyModel(who.name);
+  m.apply(m.ctl.pose(0.6));
+  const ctx = cv.getContext('2d'), W = cv.width, H = cv.height; ctx.clearRect(0, 0, W, H);
+  if (mode === 'portrait') {
+    m.group.updateMatrixWorld(true);
+    let hp = new THREE.Vector3(); m.group.traverse(o => { if (o.userData.part === (m.kind === 'quad' ? 'head' : 'head')) o.getWorldPosition(hp); });
+    const s = W / (m.kind === 'quad' ? 40 : 30);
+    if (!who.hero) ctx.translate(W, 0), ctx.scale(-1, 1);
+    drawModel(ctx, m, s, W / 2 - hp.x * s + (m.kind === 'quad' ? -W * .1 : 0), H / 2 + hp.y * s - H * .02);
+  } else {
+    const s = H / ((m.kind === 'quad' ? 80 : 150) * (m.cfg.scale || 1));
+    if (!who.hero) { ctx.translate(W, 0); ctx.scale(-1, 1); }
+    m.group.scale.setScalar(1);
+    drawModel(ctx, m, s, W / 2, H * .97, region, true);
+  }
+  m.group.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+  m.shadow.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+  return true;
+};
+// значок оружия для панели боя: клинок/дубина горизонтально, без оружия — кулак героя
+GL.drawWeapon = (cv, wi) => {
+  const ctx = cv.getContext('2d'), W = cv.width, H = cv.height; ctx.clearRect(0, 0, W, H);
+  const m = heroModel(wi, 0); m.group.updateMatrixWorld(true);
+  let src = null; m.group.traverse(o => { if (o.isMesh && o.userData.part === (wi > 0 ? null : 'handN') && !src) src = o; });
+  if (wi > 0) m.group.traverse(o => { if (o.isMesh && !o.userData.part && !o.material.userData.glow && !src) src = o; });
+  if (src) {
+    const img = src.material.map.image, w = src.geometry.parameters.width, h = src.geometry.parameters.height;
+    const k = wi > 0 ? Math.min(W / h, H / w) * .95 : Math.min(W / h, H / w) * .9;
+    ctx.translate(W / 2, H / 2); ctx.rotate(wi > 0 ? Math.PI / 2 : -Math.PI / 2); ctx.drawImage(img, -w * k / 2, -h * k / 2, w * k, h * k); ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+  m.group.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+};
+// отладка и тесты: несколько моделей на отдельном холсте
 GL.gallery = (cv, items, w, h, cols) => {
-  const r = new THREE.WebGLRenderer({ canvas: cv, antialias: true }); r.setSize(w, h, false); setupRenderer(r); r.setClearColor(0x161a20, 1);
-  const sc = new THREE.Scene(); lights(sc); sc.add(new THREE.AmbientLight(0xffffff, .6));
-  const cam = new THREE.OrthographicCamera(0, w, 0, -h, 1, 3000); cam.position.z = 900;
+  const r = new THREE.WebGLRenderer({ canvas: cv, antialias: true }); r.setSize(w, h, false); setupRenderer(r); r.setClearColor(0x2a2a30, 1);
+  const sc = new THREE.Scene();
+  const cam = new THREE.OrthographicCamera(0, w, 0, -h, -500, 500); cam.position.z = 100;
+  const wall = new THREE.Mesh(new THREE.PlaneGeometry(w * 3, h * 3), new THREE.MeshBasicMaterial({ color: 0x4a4048 })); wall.position.set(w / 2, -h / 2, -60); sc.add(wall);
   cols = cols || Math.ceil(Math.sqrt(items.length * w / h)); const rows = Math.ceil(items.length / cols), cw = w / cols, ch = h / rows;
   items.forEach((it, i) => {
     const m = it.hero ? heroModel(it.wi, it.ai) : enemyModel(it.name);
-    const hh = holder(m, m.cfg && m.cfg.q ? 36 : 28); hh.flip.scale.x = it.hero ? 1 : -1;
+    const hh = holder(m); face(hh, it.hero ? 1 : -1);
     const c = i % cols, rr = Math.floor(i / cols); hh.root.position.set(c * cw + cw / 2, -(rr * ch + ch * .92), 0); hh.root.scale.setScalar((it.s || 1) * ch / 165); sc.add(hh.root);
     if (it.anim && it.anim !== 'idle' && it.anim !== 'walk') hh.ctl.once(it.anim); else hh.ctl.loop(it.anim || 'idle');
     for (let t = 0; t < (it.t || .4); t += 1 / 60) animate(hh, 1 / 60);

@@ -44,6 +44,9 @@ const ICO = {
   case: '<path d="M5 7h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z"/><path d="M9 7V4.5h6V7M3 12.5h18"/>',
   cup: '<path d="M6 7.5h12l-1.6 13.5H7.6z"/><path d="M5 7.5h14M13 7.5l1.6-4.5H18"/>',
   lock: '<path d="M6 11h12v10H6z"/><path d="M8.5 11V8a3.5 3.5 0 0 1 7 0v3M12 15v2.5"/>',
+  target: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/><path d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4"/>',
+  close: '<circle cx="12" cy="12" r="9"/><path d="M8.5 8.5l7 7M15.5 8.5l-7 7"/>',
+  radio: '<rect x="2.5" y="8" width="19" height="12" rx="2"/><path d="M6 8l10-5"/><circle cx="15.5" cy="14" r="3"/><path d="M5.5 12h5M5.5 15h5M5.5 18h5"/>',
   lift: '<rect x="5" y="3" width="14" height="18" rx="1"/><path d="M12 3v18M8.5 8.5l1.5-2 1.5 2M12.5 15.5l1.5 2 1.5-2"/>',
 };
 // эмодзи старого интерфейса -> иконка
