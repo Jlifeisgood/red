@@ -14,7 +14,7 @@ const BASE_USE = { sbed: 'bed', sstove: 'stove', sbench: 'bench', fridge: 'stove
 const BASE_ICON = { sbed: 'bed', sstove: 'pan', sbench: 'craft', fridge: 'pan', wardrobe: 'bag', nightstand: 'diary' };
 
 let heroX = SPOT.home, cur = 1, sceneBusy = false, walkMs = 520, sceneKey = null, sceneMode = '', heroKey = '', foeKey = '';
-let liftOpen = false, introT = [], prevFloor = null, pendingSlide = null, arriveBy = null, focus = null, hitKey = '';
+let liftOpen = false, introT = [], prevFloor = null, pendingSlide = null, arriveBy = null, focus = null, hitKey = '', bgKey = '';
 const FIGHT = { hx: 0, fx: 0, dir: 1 };
 try { if (localStorage.getItem('tower-fast') === '1') walkMs = 260; } catch (e) {}
 
@@ -336,7 +336,6 @@ function renderScene() {
   // новый этаж: этаж въезжает в кадр, герой выходит из лифта или с лестницы
   if (sceneKey !== S.floor) {
     sceneKey = S.floor; sceneBusy = false; hitKey = '';
-    $('bg').innerHTML = svgBuilding(fd, zone);
     const pf = prevFloor; prevFloor = S.floor;
     const how = arriveBy; arriveBy = null;
     pendingSlide = pf == null ? null : how === 'below' ? 'up' : how === 'above' ? 'down' : how && how.startsWith('lift') ? how.slice(5) : S.floor > pf ? 'up' : 'down';
@@ -379,6 +378,8 @@ function renderScene() {
   }
   $('hero-in').classList.toggle('dead', S.screen === 'dead');
   buildHits(); buildTags();
+  const bk = S.floor + fd.lift + fd.rooms.map(r => (r.seen ? 1 : 0) + r.furn.map(f => f.s ? 1 : 0).join('')).join('/');
+  if (bk !== bgKey) { bgKey = bk; $('bg').innerHTML = svgBuilding(fd, zone); }
   // враг (запасная графика)
   const foe = $('foe');
   foe.style.display = fight ? '' : 'none';
