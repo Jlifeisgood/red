@@ -11,6 +11,7 @@
   <div id="scene" class="z0">
     <svg id="sv" viewBox="0 24 360 400" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg"></svg>
     <canvas id="gl"></canvas>
+    <div id="tags"></div>
     <svg id="ov" viewBox="0 24 360 400" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg"></svg>
     <div id="hud">
       <div id="hud-l">
@@ -25,7 +26,7 @@
       <div id="sign"><div id="floor"></div><div id="zone"></div><div id="quest"></div></div>
       <div id="hud-r">
         <div id="hud-btns">
-          <button id="btn-hl" title="Подсветить предметы"></button><button id="btn-fast" title="Быстрая ходьба"></button><button id="mute" title="Звук"></button><button id="btn-set" title="Настройки"></button>
+          <button id="btn-fast" title="Быстрая ходьба"></button><button id="mute" title="Звук"></button><button id="btn-set" title="Настройки"></button>
         </div>
         <div id="foe-hud">
           <div class="vit"><div class="stat hp"><b id="foe-hp"></b><span class="si" id="i-fhp"></span><div class="track"><div class="fill hp" id="b-fhp"></div></div></div><div id="foe-name"></div><div id="foe-tr"></div></div>
@@ -44,6 +45,7 @@
 </div>
 <div id="sheet"><div id="sheet-title"></div><div id="sheet-body"><div id="actions"></div></div></div>
 <script src="icons.js"></script>
+<script src="items.js"></script>
 <script src="art.js"></script>
 <script src="scene.js"></script>
 <script src="game.js"></script>

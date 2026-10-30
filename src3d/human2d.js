@@ -258,6 +258,21 @@ export function drawWeapon(ctx, wi, part = 'all') {
     fillP(ctx, rect(-2.6, -54, 5.2, 42), 'rgba(89,225,255,.35)'); fillP(ctx, rect(-1.4, -53, 2.8, 41), '#7ff0ff'); fillP(ctx, rect(-.5, -52, 1, 39), '#ffffff'); return [-6, -57, 6, 9]; }
   if (wi === 6) { const g = rect(-1.8, -2, 3.6, 11); cel(ctx, g, '#2b241e', { s: .8, hatch: false }); ink(ctx, g, .8); const gu = path('M -6 -4 L 6 -4 L 4 -1.6 L -4 -1.6 Z'); cel(ctx, gu, '#6c4fa8', { s: .8, lt: 1.8, hatch: false }); ink(ctx, gu, .8);
     fillP(ctx, path('M -3.4 -4 L 3.4 -4 L 2.2 -56 L 0 -64 L -2.2 -56 Z'), 'rgba(166,107,255,.35)'); const P = path('M -2 -4 L 2 -4 L 1.2 -55 L 0 -61 L -1.2 -55 Z'); fillP(ctx, P, '#d6baff'); line(ctx, [0, -6, 0, -58], .8, '#ffffff'); return [-7, -66, 7, 9]; }
+  if (wi === 7) { const P = rect(-1.4, -64, 2.8, 72); cel(ctx, P, '#b08a5a', { s: 1, lt: 1.5, hatch: false }); ink(ctx, P, 1);
+    const h = rect(-6, -68, 12, 6); cel(ctx, h, '#4a7ab0', { s: 1, hatch: false }); ink(ctx, h, .9);
+    for (let i = 0; i < 9; i++) { const x = -5 + i * 1.25; line(ctx, [x, -68, x * 1.5 + Math.sin(i * 2.3) * 1.5, -84 + (i % 3) * 2], 1.3, i % 2 ? '#cfc8b2' : '#b5ae98'); }
+    blood(ctx, h, 0, -66, 2, 1); return [-10, -88, 10, 9]; }
+  if (wi === 8) { const g = rect(-1.8, -2, 3.6, 10); cel(ctx, g, '#2b241e', { s: .8, hatch: false }); [1, 5].forEach(y => fillP(ctx, ell(0, y, .6, .6), '#9aa0a6')); ink(ctx, g, .9);
+    const P = path('M -1.8 -2.6 L 2.4 -2.6 L 2.6 -20 C 2.4 -24 1 -27 -.4 -29 C -1.4 -24 -1.8 -14 -1.8 -2.6 Z'); cel(ctx, P, '#c8d0da', { s: 1, lt: 1.6, hatch: false }); line(ctx, [1.8, -4, 1.6, -24], .5, '#ffffff', .8); blood(ctx, P, 0, -18, 1.6, 1, true); ink(ctx, P, 1); return [-5, -31, 5, 9]; }
+  if (wi === 9) { line(ctx, [0, 7, 0, -46, -1.5, -52, -6, -54.5, -9, -52], 4.4, INK); line(ctx, [0, 7, 0, -46, -1.5, -52, -6, -54.5, -9, -52], 2.8, '#b3261e');
+    line(ctx, [.6, 4, .6, -44], .7, '#ff8a7a', .7); line(ctx, [0, 7, 1.6, 9], 3, INK); blood(ctx, rect(-3, -50, 6, 10), -2, -48, 2, 2); return [-12, -58, 6, 11]; }
+  if (wi === 10) { const P = rect(-1.6, -72, 3.2, 80); cel(ctx, P, '#7d8794', { s: 1.2, lt: 1.7, hatch: false }); ink(ctx, P, 1);
+    for (const y of [-6, -2, 2, -66, -62]) fillP(ctx, rect(-2.2, y, 4.4, 2.6), '#2a2a2c');
+    const B = path('M -2.6 -70 L 2.6 -70 L 2 -84 L 0 -94 L -2 -84 Z'); cel(ctx, B, '#c4ccd6', { s: 1, lt: 1.5, hatch: false }); line(ctx, [0, -72, 0, -90], .5, '#4a5058', .8); blood(ctx, B, 0, -84, 2, 2, true); ink(ctx, B, 1.1); return [-6, -97, 6, 10]; }
+  if (wi === 11) { const P = rect(-1.9, -60, 3.8, 68); cel(ctx, P, '#8a5a2a', { s: 1.2, lt: 1.5 }); line(ctx, [-.6, -4, -.6, -56], .5, '#c89a62', .6); ink(ctx, P, 1.1);
+    const hd = path('M -2.6 -62 L 2.6 -62 L 2.6 -50 L -2.6 -50 Z'); cel(ctx, hd, '#2a2a2c', { s: .8, hatch: false }); ink(ctx, hd, .9);
+    const B = path('M 2.4 -63 C 8 -64 12 -67 15.5 -70 C 17 -61 17 -50 15.5 -42 C 12 -45 8 -48 2.4 -50 Z'); cel(ctx, B, '#b3261e', { s: 1.6, lt: 1.5 }); fillP(ctx, path('M 13.2 -68 C 14.6 -60 14.6 -51 13.2 -44 L 15.5 -42 C 17 -50 17 -61 15.5 -70 Z'), '#d8dde2'); blood(ctx, B, 12, -52, 2.4, 3, true); ink(ctx, B, 1.2);
+    const S2 = path('M -2.4 -60 L -10 -56.5 L -2.4 -52 Z'); cel(ctx, S2, '#b3261e', { s: .8, hatch: false }); ink(ctx, S2, 1); return [-12, -73, 18, 10]; }
   return null;
 }
 

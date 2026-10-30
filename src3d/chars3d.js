@@ -4,6 +4,7 @@ import { makePost } from './post.js';
 import * as THREE from 'three';
 import { buildHuman2D, buildQuad2D } from './rig2d.js';
 import { PROPS, DECO } from './props2d.js';
+import { drawFurn, PAL } from './furn2d.js';
 
 const GL = { ready: false, enabled: true, active: false };
 try { GL.enabled = localStorage.getItem('tower-3d') !== '0'; } catch (e) {}
@@ -185,7 +186,7 @@ GL.update = (o) => {
   if (o.floorKey !== bldKey) {
     bldKey = o.floorKey;
     if (bld) { scene.remove(bld.root); bld.dispose(); bld = null; }
-    try { bld = buildBuilding({ zone: o.zone, floor: o.floor, base: o.base, rooms: o.rooms, levels: o.levels }, o.layout); scene.add(bld.root); } catch (e) { console.error(e); bld = null; }
+    try { bld = buildBuilding({ zone: o.zone, floor: o.floor, base: o.base, top: o.top, exit: o.exit, rooms: o.rooms, vend: o.vend, levels: o.levels }, o.layout, o.catalog); scene.add(bld.root); } catch (e) { console.error(e); bld = null; }
     // поездка на лифте: новый этаж въезжает сверху (подъём) или снизу (спуск в убежище), будто камера едет вместе с кабиной
     blood.length = 0; dying.forEach(disposeHolder); dying = [];
     if (bld && o.slide) { const d = o.layout.roomH + o.layout.slab; slide = { t0: performance.now(), dur: 1050, from: o.slide === 'up' ? d : -d }; bld.root.position.y = slide.from; } else slide = null;
@@ -258,7 +259,7 @@ function updateBlood(dt) {
       new THREE.PointsMaterial({ color: 0x7a0a06, size: 3.2, sizeAttenuation: false, transparent: true, opacity: .95, depthWrite: false }));
     bloodPts.frustumCulled = false; bloodPts.renderOrder = 40; scene.add(bloodPts);
   }
-  const P = bloodPts.geometry.attributes.position, floorY = lastState ? -lastState.layout.floorY + 3 : -400;
+  const P = bloodPts.geometry.attributes.position, floorY = lastState ? -lastState.layout.floorY + 4 : -396;
   for (let i = blood.length - 1; i >= 0; i--) {
     const b = blood[i]; b.life -= dt; b.wall -= dt;
     b.vy -= 520 * dt; b.x += b.vx * dt; b.y += b.vy * dt;
@@ -349,10 +350,28 @@ GL.drawScene = (cv, kind, extra) => {
   }
   g = ctx.createLinearGradient(0, 0, 0, 300); g.addColorStop(0, '#24252b'); g.addColorStop(1, '#17181c'); ctx.fillStyle = g; ctx.fillRect(0, 0, wu, 300);
   ctx.fillStyle = 'rgba(255,255,255,.025)'; for (let x = 0; x < wu; x += 16) ctx.fillRect(x, 0, 8, FL);
-  ctx.save(); ctx.translate(wu * .66, 108); ctx.scale(2.1, 2.1); DECO.window(ctx, 0, 0); ctx.restore();
+  if (kind !== 'lift') { ctx.save(); ctx.translate(wu * .66, 108); ctx.scale(2.1, 2.1); DECO.window(ctx, 0, 0); ctx.restore(); }
   ctx.fillStyle = '#121214'; ctx.fillRect(0, FL, wu, 300 - FL); ctx.fillStyle = 'rgba(255,255,255,.06)'; ctx.fillRect(0, FL, wu, 1.5);
   if (kind === 'npc') { PROPS.radiator(ctx, wu * .6, FL); PROPS.boxes(ctx, wu * .78, FL); }
-  if (kind === 'vending') { ctx.save(); ctx.translate(wu * .32, FL); ctx.scale(2.6, 2.6); PROPS.vending(ctx, -20, 0); ctx.restore(); }
+  if (kind === 'lift') {
+    // двери лифта крупно: исправный — светится табло, сломанный — оборванные провода и лента
+    const ok = extra && extra.ok, lx = wu * .5;
+    ctx.fillStyle = '#0a0b0d'; ctx.fillRect(lx - 64, FL - 196, 128, 196);
+    ctx.fillStyle = '#4a4e52'; ctx.fillRect(lx - 72, FL - 206, 144, 12); ctx.fillRect(lx - 72, FL - 206, 10, 206); ctx.fillRect(lx + 62, FL - 206, 10, 206);
+    const gd = ctx.createLinearGradient(lx - 62, 0, lx + 62, 0); gd.addColorStop(0, '#7e858b'); gd.addColorStop(.5, '#a8afb5'); gd.addColorStop(1, '#6a7076'); ctx.fillStyle = gd;
+    const gap = ok ? 26 : 1; ctx.fillRect(lx - 62, FL - 192, 62 - gap, 192); ctx.fillRect(lx + gap, FL - 192, 62 - gap, 192);
+    if (ok) { const lg = ctx.createLinearGradient(0, FL - 192, 0, FL); lg.addColorStop(0, 'rgba(255,240,200,.85)'); lg.addColorStop(1, 'rgba(255,220,160,.25)'); ctx.fillStyle = lg; ctx.fillRect(lx - gap, FL - 192, gap * 2, 192); }
+    ctx.fillStyle = '#060708'; ctx.fillRect(lx - 30, FL - 232, 60, 20); ctx.fillStyle = ok ? '#7dff9a' : '#ff5a3a'; ctx.font = '700 15px monospace'; ctx.textAlign = 'center'; ctx.fillText(ok ? '▲▼' : '--', lx, FL - 216);
+    if (!ok) {
+      [[-.45, -120], [.38, -60]].forEach(([a, y]) => { ctx.save(); ctx.translate(lx, FL + y); ctx.rotate(a); ctx.fillStyle = '#d9ad1f'; ctx.fillRect(-90, -10, 180, 20); ctx.fillStyle = '#15171c'; for (let i = -90; i < 90; i += 18) { ctx.beginPath(); ctx.moveTo(i, -10); ctx.lineTo(i + 9, -10); ctx.lineTo(i + 2, 10); ctx.lineTo(i - 7, 10); ctx.fill(); } ctx.restore(); });
+      ctx.strokeStyle = '#2a2a2a'; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(lx + 84, FL - 150); ctx.quadraticCurveTo(lx + 110, FL - 100, lx + 96, FL - 60); ctx.stroke();
+      ctx.strokeStyle = '#c0302a'; ctx.beginPath(); ctx.moveTo(lx + 88, FL - 150); ctx.quadraticCurveTo(lx + 120, FL - 110, lx + 112, FL - 74); ctx.stroke();
+      ctx.fillStyle = '#ffe34d'; for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.arc(lx + 112 + Math.cos(i * 1.3) * 8, FL - 74 + Math.sin(i * 1.3) * 8, 1.6, 0, 7); ctx.fill(); }
+    }
+    ctx.fillStyle = '#2a2e33'; ctx.fillRect(lx + 82, FL - 150, 16, 30); ctx.fillStyle = ok ? '#5cff7a' : '#ff3020'; ctx.beginPath(); ctx.arc(lx + 90, FL - 142, 3.4, 0, 7); ctx.fill();
+  }
+  if (kind === 'bed') { ctx.save(); ctx.translate(wu * .2, FL - 58 * 2); ctx.scale(2, 2); drawFurn(ctx, 'sbed', 116, 58, false, PAL.base, 3, (extra && extra.lvl) || 1); ctx.restore(); }
+  if (kind === 'vending') { ctx.save(); ctx.translate(wu * .32 - 53, FL - 220); ctx.scale(2.2, 2.2); drawFurn(ctx, 'vending', 48, 100, false, PAL.z1); ctx.restore(); }
   if (kind === 'locked') { ctx.save(); ctx.translate(wu * .32, FL); ctx.scale(2.2, 2.2); PROPS.door(ctx, -25, 0); ctx.restore(); }
   if (kind === 'box') { ctx.save(); ctx.translate(wu * .3, FL); ctx.scale(1.8, 1.8); PROPS.crates(ctx, -32, 0); ctx.restore(); PROPS.radiator(ctx, wu * .7, FL); }
   if (kind === 'npc') { const m = posed(npcModel('trader'), 'idle', .8); drawFig(ctx, m, s * 1.85, W * .3, FL * s); freeModel(m); }

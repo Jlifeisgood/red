@@ -134,7 +134,7 @@ export function buildHuman2D(cfg, wi) {
     if (wi > 0) {
       const weapon = G(haN, .6, -4.6); weapon.rotation.z = -2.15;
       weapon.add(sprite('w' + wi, { bounds: WB[wi], draw: ctx => drawWeapon(ctx, wi, 'all'), far: 0 }, 32, shadow ? smats : mats, shadow ? 'shadow' : 'main'));
-      if (wi >= 4 && !shadow) weapon.add(sprite('wg' + wi, { bounds: WB[wi], draw: ctx => drawWeapon(ctx, wi, 'glow'), far: 0 }, 34, [], 'glow'));
+      if (wi >= 4 && wi <= 6 && !shadow) weapon.add(sprite('wg' + wi, { bounds: WB[wi], draw: ctx => drawWeapon(ctx, wi, 'glow'), far: 0 }, 34, [], 'glow'));
     }
     return { root, J };
   };
@@ -156,7 +156,7 @@ export function buildHuman2D(cfg, wi) {
   const tweak = p => { if (!VAR || p.rot > .3) return p; const q = Object.assign({}, p); for (const k in VAR) q[k] += VAR[k]; return q; };
   return { group: main.root, shadow: shade.root, mats, smats, ctl, kind: 'human', spec: S, apply(p) { p = tweak(p); put(main.J, p); put(shade.J, p); } };
 }
-const WB = { 1: [-6, -56, 6, 8], 2: [-9, -56, 9, 8], 3: [-6, -54, 9, 11], 4: [-9, -62, 9, 9], 5: [-6, -57, 6, 9], 6: [-7, -66, 7, 9] };
+const WB = { 1: [-6, -56, 6, 8], 2: [-9, -56, 9, 8], 3: [-6, -54, 9, 11], 4: [-9, -62, 9, 9], 5: [-6, -57, 6, 9], 6: [-7, -66, 7, 9], 7: [-10, -88, 10, 9], 8: [-5, -31, 5, 9], 9: [-12, -58, 6, 11], 10: [-6, -97, 6, 10], 11: [-12, -73, 18, 10] };
 
 // ---------- сборка зверя ----------
 export function buildQuad2D(cfg) {
