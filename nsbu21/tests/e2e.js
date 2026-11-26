@@ -43,7 +43,7 @@ const ok = (c, m) => { if (!c) { console.log('FAIL', m); process.exitCode = 1; }
   // place the accounts yourself in another example (business trip: 4220/5010, 9420/4220, 1090/4220, 9420/1090)
   const pickBySearch = async (side, q) => { await p.click('#slot-' + side); await p.fill('.ov .search', q); await p.press('.ov .search', 'Enter'); await p.waitForTimeout(80); };
   await p.goto('file://' + file + '#cases'); await p.waitForTimeout(300);
-  await p.click('.case >> nth=6'); await p.click('#next'); await p.waitForTimeout(150);
+  await p.click('.case:has-text("Командировка")'); await p.click('#next'); await p.waitForTimeout(150);
   await p.click('[data-k="am:input"]'); await p.waitForTimeout(100);
   ok(!!(await p.$('#slot-d')) && await p.$eval('#check', x => x.disabled), 'slots shown, «Проверить» waits for both accounts');
   await pickBySearch('d', '4220');
@@ -66,6 +66,46 @@ const ok = (c, m) => { if (!c) { console.log('FAIL', m); process.exitCode = 1; }
   await pickBySearch('d', '2510'); await pickBySearch('k', '1090'); await p.click('#check');
   const fbt = await p.textContent('#fb');
   ok(/По дебету вы поставили 2510/.test(fbt) && /Кредит 1090 — верно/.test(fbt) && !!(await p.$('.slot.bad')) && !!(await p.$('.slot.ok')), 'wrong debit explained, right credit confirmed');
+  // operations of several lines with sums to work out (ducts2)
+  const fillLine = async (i, d, k, s) => {
+    await p.click(`#slot-d-${i}`); await p.fill('.ov .search', d); await p.press('.ov .search', 'Enter'); await p.waitForTimeout(60);
+    await p.click(`#slot-k-${i}`); await p.fill('.ov .search', k); await p.press('.ov .search', 'Enter'); await p.waitForTimeout(60);
+    await p.fill(`#amt-${i}`, String(s));
+  };
+  const toList = async () => { await p.goto('file://' + file + '#cases'); await p.waitForTimeout(200); for (let k = 0; k < 3 && !(await p.$('.cases')); k++) { await p.evaluate(() => window.handleBack()); await p.waitForTimeout(100); } };
+  await toList();
+  await p.click('.case:has-text("считаем сами")'); await p.click('#next'); await p.waitForTimeout(150);
+  if (!(await p.$('.lcard'))) await p.click('[data-k="am:input"]');
+  ok(/Суммы считаете сами/.test(await p.textContent('.prompt')) && await p.$eval('#check', x => x.disabled), 'computed sum asked, check waits for it');
+  await fillLine(0, '5110', '6310', 151200000);
+  ok(!(await p.$eval('#check', x => x.disabled)), 'check enabled once accounts and sum are in');
+  await p.click('#check'); ok(!!(await p.$('.fb.ok')), 'computed advance accepted');
+  await p.click('#next'); await p.waitForTimeout(100);
+  ok((await p.$$('.lcard')).length === 2, 'two line cards for steel + VAT');
+  await fillLine(0, '4410', '6010', 14400000); await fillLine(1, '1010', '6010', 120000000);
+  await p.screenshot({ path: outdir + '/e2e_multi.png', fullPage: true });
+  await p.click('#check'); ok(!!(await p.$('.fb.ok')) && (await p.$$('.lcard.ok')).length === 2, 'lines accepted in any order');
+  await p.click('#next'); await p.waitForTimeout(100);
+  await fillLine(0, '6010', '5110', 120000000); await p.click('#check');
+  const fbs = (await p.textContent('#fb')).replace(/\u00a0/g, ' ');
+  ok(/сумма 120 000 000, а нужно 134 400 000/.test(fbs) && !!(await p.$('.amt-in.badb')) && (await p.$$('.slot.ok')).length === 2, 'wrong sum explained, accounts marked right');
+  await p.screenshot({ path: outdir + '/e2e_multi_bad.png', fullPage: true });
+  await p.click('#next'); await p.waitForTimeout(100);
+  await p.click('[data-k="am:choice"]'); await p.waitForTimeout(100);
+  ok((await p.$$('.opt .lset')).length === 4, 'four sets of lines to choose from');
+  await p.screenshot({ path: outdir + '/e2e_sets.png', fullPage: true });
+  await p.click('.opt >> nth=0'); ok(!!(await p.$('.fb')) && /Разбор операции/.test(await p.textContent('#fb')), 'set answer shows the breakdown');
+  await p.click('[data-k="am:input"]').catch(() => {});
+  // read mode lists every line
+  await p.evaluate(() => window.handleBack());
+  await p.click('button:has-text("Читать решение")'); await p.waitForTimeout(200);
+  ok((await p.$$('#st-1 .step-p')).length === 2 && (await p.$$('#st-5 .step-p')).length === 3, 'solution shows all lines of an operation');
+  // leasing example: a simple step and a two-line payment
+  await toList();
+  await p.click('.case:has-text("Станок в лизинг")'); await p.click('#next'); await p.waitForTimeout(150);
+  if (!(await p.$('#slot-d'))) await p.click('[data-k="am:input"]');
+  await pickBySearch('d', '0310'); await pickBySearch('k', '7910'); await p.click('#check');
+  ok(!!(await p.$('.fb.ok')), 'lease: asset and long-term debt');
   // trainer: recent accounts and «Не знаю»
   await p.goto('file://' + file + '#entries'); await p.waitForTimeout(300);
   if (!(await p.$('#slot-d'))) await p.click('[data-k="am:input"]');

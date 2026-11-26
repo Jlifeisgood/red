@@ -3,7 +3,7 @@ const fs = require('fs');
 const [,, file] = process.argv;
 let html = fs.readFileSync(file, 'utf8');
 const i = html.lastIndexOf('})();');
-html = html.slice(0, i) + 'window.__T = { CASES, ENT, ENT_BY, BY, ledger, balOf, whyEntry, explainView, caseOptions, PLAIN, ACC, SUBS, money };\n' + html.slice(i);
+html = html.slice(0, i) + 'window.__T = { CASES, ENT, ENT_BY, BY, ledger, balOf, whyEntry, explainView, caseOptions, caseSetOptions, matchLines, PLAIN, ACC, SUBS, money };\n' + html.slice(i);
 const tmp = require('path').join(require('os').tmpdir(), 'nsbu21-validate.html'); fs.writeFileSync(tmp, html);
 (async () => {
   const b = await chromium.launch(); const p = await b.newPage();
@@ -20,12 +20,21 @@ const tmp = require('path').join(require('os').tmpdir(), 'nsbu21-validate.html')
       const open = (c.open || []).reduce((a, [, v]) => a + v, 0); if (open !== 0) out.push(c.id + ' opening not balanced ' + open);
       c.steps.forEach((st, n) => {
         const tag = `${c.id}#${n + 1}`;
-        for (const code of [st.dt, st.kt]) if (!T.BY[code] || T.BY[code].isGroup) out.push(tag + ' bad code ' + code);
-        if (!(st.s > 0)) out.push(tag + ' bad sum');
-        if (st.ref) { const e = T.ENT_BY[st.ref]; if (!e) out.push(tag + ' missing ref ' + st.ref); else if (!e.dc.includes(st.dt) || !e.kc.includes(st.kt)) out.push(`${tag} ref ${st.ref} is ${e.dt}/${e.kt}, step ${st.dt}/${st.kt}`); }
-        else warn.push(tag + ' no ref ' + st.dt + '/' + st.kt);
-        if (!T.whyEntry({ dt: st.dt, kt: st.kt, dc: [st.dt], kc: [st.kt] })) out.push(tag + ' no why');
-        for (let r = 0; r < 20; r++) { const o = T.caseOptions(st); if (o.length !== 4 || o.filter(x => x.ok).length !== 1) { out.push(tag + ' options ' + o.length); break; } }
+        if (!Array.isArray(st.lines) || !st.lines.length) out.push(tag + ' no lines');
+        for (const l of st.lines) {
+          for (const code of [l.dt, l.kt]) if (!T.BY[code] || T.BY[code].isGroup) out.push(tag + ' bad code ' + code);
+          if (!(l.s > 0) || Math.round(l.s) !== l.s) out.push(tag + ' bad sum ' + l.s);
+          if (l.ref) { const e = T.ENT_BY[l.ref]; if (!e) out.push(tag + ' missing ref ' + l.ref); else if (!e.dc.includes(l.dt) || !e.kc.includes(l.kt)) out.push(`${tag} ref ${l.ref} is ${e.dt}/${e.kt}, line ${l.dt}/${l.kt}`); }
+          else warn.push(tag + ' no ref ' + l.dt + '/' + l.kt);
+          if (!T.whyEntry({ dt: l.dt, kt: l.kt, dc: [l.dt], kc: [l.kt] })) out.push(tag + ' no why ' + l.dt + '/' + l.kt);
+        }
+        for (let r = 0; r < 20; r++) {
+          if (st.multi) {
+            const o = T.caseSetOptions(st), good = o.filter(x => x.ok);
+            if (o.length !== 4 || good.length !== 1 || o.some(x => !x.ok && T.matchLines(x.lines, st.lines).ok)) { out.push(tag + ' set options ' + o.length); break; }
+          } else { const o = T.caseOptions(st); if (o.length !== 4 || o.filter(x => x.ok).length !== 1) { out.push(tag + ' options ' + o.length); break; } }
+        }
+        if (st.multi && !T.matchLines(st.lines.slice().reverse(), st.lines).ok) out.push(tag + ' order matters');
         // running balances keep their natural side
         const B = T.ledger(c, n + 1);
         for (const [code, x] of Object.entries(B)) {

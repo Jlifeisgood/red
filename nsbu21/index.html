@@ -496,8 +496,8 @@ details.howto{margin-top:12px}
 /* placing the accounts yourself */
 .amode{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:12px;font-size:13px;color:var(--muted)}
 .amode .seg button{padding:6px 13px;font-size:13px}
-.slots{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-@media (max-width:560px){.slots{grid-template-columns:1fr}}
+.slots{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+@media (max-width:560px){.slots{grid-template-columns:minmax(0,1fr)}}
 .slot{display:grid;gap:8px;justify-items:start;align-content:start;width:100%;min-height:84px;padding:11px 14px 13px;text-align:left;border:1.5px dashed var(--rule);border-radius:12px;background:var(--sheet);color:var(--ink)}
 .slot .sl{display:inline-flex;align-items:center;gap:4px;padding:0 8px;border-radius:5px;font:700 11px/1.75 var(--f-body);letter-spacing:.02em}
 .slot.d .sl{background:var(--dt-bg);color:var(--dt)} .slot.k .sl{background:var(--kt-bg);color:var(--kt)}
@@ -530,6 +530,34 @@ details.howto{margin-top:12px}
 .pchips{display:flex;flex-wrap:wrap;gap:6px}
 .pchips .chip{max-width:100%;white-space:normal;text-align:left;color:var(--ink)}
 .pchips .chip b{font-family:var(--f-mono)}
+
+/* operations of several lines */
+.mchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.mchips span{padding:2px 10px;border-radius:999px;border:1px solid var(--line);background:var(--sheet-2);font-size:12px;font-weight:600;color:var(--muted)}
+.mchips .calc{border-color:transparent;background:var(--tr-bg);color:var(--tr)}
+.opts.one{grid-template-columns:1fr}
+.opts.one .opt .v{flex:1 1 auto}
+.lset{display:grid;gap:8px;width:100%}
+.lrow{display:grid;grid-template-columns:auto minmax(0,1fr);gap:0 10px;align-items:baseline}
+.lrow .pp{font:700 13px var(--f-mono);white-space:nowrap}
+.lrow .pp .d{color:var(--dt)} .lrow .pp .k{color:var(--kt)}
+.lrow .ls{justify-self:end;font:700 13px var(--f-mono);white-space:nowrap}
+.lrow .ln{grid-column:1/-1;font-size:12px;line-height:1.3;color:var(--muted)}
+.lcards{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+.lcard{padding:10px 12px 12px;border:1px solid var(--rule);border-radius:12px;background:var(--sheet-2)}
+.lcard.ok{border-color:var(--ok)} .lcard.bad{border-color:var(--bad)}
+.lh{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:24px;margin-bottom:6px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.lh .linkbtn{padding:2px 0;font-size:13px;letter-spacing:0;text-transform:none}
+.slots.two{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.slot.sm{min-height:64px;gap:6px;padding:8px 10px 10px}
+.slot.sm .sv .cc{font-size:18px}
+.slot.sm .sv .nn{flex-basis:100%;font-size:12px;line-height:1.3}
+.slot.sm .sv.ph{font-size:14px}
+.amt-row{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px;color:var(--muted)}
+.inp.amt-in{flex:1 1 0;width:0;min-width:0;padding:8px 12px;font-size:18px;letter-spacing:.04em}
+.lnotes{margin:10px 0 0;padding-left:18px;font-size:14px;line-height:1.45}
+.lnotes li + li{margin-top:4px}
+.refs{margin-top:6px}
 
 .foot{margin-top:30px;color:var(--muted);font-size:12px;line-height:1.6;max-width:80ch}
 .loading{padding:40px 0;color:var(--muted)}
@@ -728,7 +756,7 @@ const MODE_INFO = {
   cards: { t: 'Карточки', ic: 'cards', tint: 'c1', d: 'Видите код — вспоминаете название, или наоборот. Лучший старт.' },
   test: { t: 'Тест', ic: 'test', tint: 'c2', d: 'Выберите верный ответ из вариантов или наберите код сами.' },
   entries: { t: 'Проводки', ic: 'tacc', tint: 'c3', d: 'По описанию операции определите счёт дебета и счёт кредита — с объяснением, почему так.' },
-  cases: { t: 'Примеры', ic: 'factory', tint: 'c5', d: 'Задачи из практики с суммами: производство воздуховодов, монтаж, торговля, станок, брак, кредит…' },
+  cases: { t: 'Примеры', ic: 'factory', tint: 'c5', d: 'Задачи из практики с суммами: воздуховоды, монтаж, торговля, станок, лизинг, брак, кредит, дивиденды…' },
   ref: { t: 'Справочник', nav: 'Справка', ic: 'book', tint: 'c4', d: 'Весь план счетов: поиск по коду и названию, проводки по каждому счёту.' }
 };
 const NAV = ['home', 'cards', 'test', 'entries', 'cases', 'ref'];
@@ -2060,6 +2088,82 @@ const CASES = [
     ['Ещё должны поставщикам', B => -B.bal('6010')],
     ['Должны бюджету (налог на прибыль)', B => -B.bal('6410')]
   ] },
+{ id: 'ducts2', ic: 'factory', lvl: 'Составные проводки', tags: ['несколько строк', 'расчёт сумм', 'аванс', 'незавершёнка'],
+  title: 'Заказ на воздуховоды: считаем сами',
+  short: 'Одна операция — несколько строк проводки, суммы НДС, налогов и себестоимости считаете сами.',
+  firm: 'ООО «ВентПрофиль» получило крупный заказ от торгового центра: 3 000 м² воздуховодов по 90 000 сум за м² без НДС. Цех работает месяц: закупает, производит, отгружает, платит зарплату и налоги.',
+  goal: 'Здесь как в настоящей бухгалтерии: одна операция часто записывается несколькими строками (например, сталь и НДС по ней), а суммы нужно посчитать самому. В режиме «Ставлю сам» заполните каждую строку: дебет, кредит и сумму. Порядок строк не важен.',
+  open: [['0120', 400000000], ['0220', -82000000], ['0130', 300000000], ['0230', -65000000], ['1010', 10000000], ['5110', 150000000], ['8330', -713000000]],
+  openNote: 'На складе осталось стали на 10 000 000 с прошлого месяца.',
+  steps: [
+    { ch: 'Заказ и аванс', t: 'Заказчик перечислил аванс — 50% от суммы заказа с НДС 12%. Заказ: 3 000 м² по 90 000 сум.',
+      lines: [{ dt: '5110', kt: '6310', s: 151200000, ref: '226.10', c: 1 }],
+      w: '3 000 × 90 000 = 270 000 000; с НДС 12% — 302 400 000; половина — 151 200 000. Деньги пришли (дебет 5110), но воздуховоды ещё не отгружены: это долг перед заказчиком, кредит 6310. Не выручка!' },
+    { ch: 'Закупка', t: 'Пришло 30 тонн оцинкованной стали по 4 000 000 сум за тонну без НДС, плюс НДС 12%. Оплата позже.',
+      lines: [{ dt: '1010', kt: '6010', s: 120000000, ref: '104.1', c: 1 }, { dt: '4410', kt: '6010', s: 14400000, ref: '257.6', c: 1 }],
+      w: 'Сталь: 30 × 4 000 000 = 120 000 000 — на склад (Дт 1010). НДС: 120 000 000 × 12% = 14 400 000 — к зачёту (Дт 4410). Обе суммы — наш долг поставщику: кредит 6010, всего 134 400 000. Одна операция — две строки с общим кредитом.' },
+    { t: 'Поставщику стали перечислено всё, что ему должны.',
+      lines: [{ dt: '6010', kt: '5110', s: 134400000, ref: '226.15', c: 1 }],
+      w: 'Долг поставщику — 120 000 000 + 14 400 000 = 134 400 000. Долг закрыт (дебет 6010), деньги ушли (кредит 5110).' },
+    { t: 'Куплены фланцы, заклёпки и герметик на 15 000 000 сум у поставщика без НДС и сразу оплачены с расчётного счёта.',
+      lines: [{ dt: '1020', kt: '6010', s: 15000000, ref: '104.1' }, { dt: '6010', kt: '5110', s: 15000000, ref: '226.15' }],
+      w: 'Даже если платим сразу, покупку проводят через расчёты с поставщиком: сначала комплектующие пришли (Дт 1020 Кт 6010), потом долг оплачен (Дт 6010 Кт 5110). Так в учёте видно и покупку, и оплату.' },
+    { ch: 'Производство', t: 'В цех отпущены сталь на 110 000 000 и комплектующие на 14 000 000.',
+      lines: [{ dt: '2010', kt: '1010', s: 110000000, ref: '120.3' }, { dt: '2010', kt: '1020', s: 14000000, ref: '120.3' }],
+      w: 'Два разных склада — две строки: сталь уходит с 1010, комплектующие — с 1020. Дебет в обеих строках один — 2010, затраты производства.' },
+    { t: 'Начислена зарплата за месяц: рабочим цеха — 40 000 000, мастеру и кладовщику — 10 000 000, директору и бухгалтеру — 16 000 000.',
+      lines: [{ dt: '2010', kt: '6710', s: 40000000, ref: '120.17' }, { dt: '2510', kt: '6710', s: 10000000, ref: '130.13' }, { dt: '9420', kt: '6710', s: 16000000, ref: '290.5' }],
+      w: 'Кредит у всех строк один — 6710, долг по зарплате. А дебет зависит от того, где работает человек: рабочие делают изделия — 2010; мастер и кладовщик обслуживают весь цех — 2510; директор и бухгалтер управляют фирмой — 9420.' },
+    { t: 'Начислен социальный налог 12% на всю зарплату этого месяца.',
+      lines: [{ dt: '2010', kt: '6520', s: 4800000, ref: '120.16', c: 1 }, { dt: '2510', kt: '6520', s: 1200000, ref: '130.12', c: 1 }, { dt: '9420', kt: '6520', s: 1920000, ref: null, c: 1 }],
+      w: 'Налог идёт туда же, куда и зарплата: 40 000 000 × 12% = 4 800 000 — в 2010; 10 000 000 × 12% = 1 200 000 — в 2510; 16 000 000 × 12% = 1 920 000 — в 9420. Кредит везде 6520. Пару Дт 9420 Кт 6520 таблицы Инструкции отдельно не называют, она следует из того же правила.' },
+    { t: 'Из всей зарплаты месяца удержан НДФЛ 12%.',
+      lines: [{ dt: '6710', kt: '6410', s: 7920000, ref: '275.4', c: 1 }],
+      w: 'Вся зарплата: 40 000 000 + 10 000 000 + 16 000 000 = 66 000 000; НДФЛ — 66 000 000 × 12% = 7 920 000. Это налог работника: долг перед работниками меньше (Дт 6710), перед бюджетом больше (Кт 6410).' },
+    { t: 'Начислен износ за месяц: станков — 5 000 000, здания цеха — 2 000 000.',
+      lines: [{ dt: '2010', kt: '0230', s: 5000000, ref: '120.1' }, { dt: '2510', kt: '0220', s: 2000000, ref: '130.1' }],
+      w: 'Станки делают изделия — их износ прямо в 2010 (кредит 0230). Здание нужно всему цеху — износ в 2510 (кредит 0220).' },
+    { t: 'Получен счёт за электроэнергию цеха: 5 000 000 сум плюс НДС 12%.',
+      lines: [{ dt: '2510', kt: '6010', s: 5000000, ref: '130.9' }, { dt: '4410', kt: '6010', s: 600000, ref: '257.6', c: 1 }],
+      w: 'Энергия — расход цеха в целом: 5 000 000 в Дт 2510. НДС 5 000 000 × 12% = 600 000 — к зачёту, Дт 4410. Кредит обеих строк — 6010, долг поставщику энергии.' },
+    { t: 'Конец месяца: все общепроизводственные расходы перенесены в себестоимость.',
+      lines: [{ dt: '2010', kt: '2510', s: 18200000, ref: '120.8', c: 1 }],
+      w: 'На 2510 за месяц: зарплата 10 000 000 + соцналог 1 200 000 + износ здания 2 000 000 + энергия 5 000 000 = 18 200 000. Всё это переносим в 2010, и счёт 2510 закрывается.' },
+    { t: 'На склад сдано 2 500 м² воздуховодов. Остальное не доделано: незавершённое производство на конец месяца оценено в 10 000 000.',
+      lines: [{ dt: '2810', kt: '2010', s: 182000000, ref: '120.27', c: 1 }],
+      w: 'Затраты месяца на 2010: 110 000 000 + 14 000 000 + 40 000 000 + 4 800 000 + 5 000 000 + 18 200 000 = 192 000 000. Недоделанная часть, 10 000 000, остаётся на 2010 — это незавершённое производство. В готовую продукцию: 192 000 000 − 10 000 000 = 182 000 000, то есть 72 800 сум за м².' },
+    { ch: 'Отгрузка и расчёты', t: 'Заказчику отгружены все 2 500 м² по 90 000 сум; начислен НДС 12%.',
+      lines: [{ dt: '4010', kt: '9010', s: 225000000, ref: '174.1', c: 1 }, { dt: '4010', kt: '6410', s: 27000000, ref: '275.2', c: 1 }],
+      w: 'Выручка: 2 500 × 90 000 = 225 000 000 (Кт 9010). НДС: 225 000 000 × 12% = 27 000 000 (Кт 6410). Заказчик должен обе суммы — дебет 4010, всего 252 000 000.' },
+    { t: 'Списана себестоимость отгруженных воздуховодов.',
+      lines: [{ dt: '9110', kt: '2810', s: 182000000, ref: '141.11', c: 1 }],
+      w: 'Отгружено всё, что сдали на склад: 2 500 м² × 72 800 = 182 000 000. Со склада (Кт 2810) — в себестоимость продаж (Дт 9110).' },
+    { t: 'Аванс заказчика зачтён в оплату, остаток заказчик перечислил на расчётный счёт.',
+      lines: [{ dt: '6310', kt: '4010', s: 151200000, ref: '272.2' }, { dt: '5110', kt: '4010', s: 100800000, ref: '226.3', c: 1 }],
+      w: 'Заказчик должен 252 000 000. Аванс 151 200 000 засчитываем — долг по авансу закрыт (Дт 6310 Кт 4010). Остаток 252 000 000 − 151 200 000 = 100 800 000 пришёл деньгами (Дт 5110 Кт 4010).' },
+    { ch: 'Налоги и зарплата', t: 'Весь НДС к зачёту за месяц зачтён. В бюджет перечислены НДС к уплате и НДФЛ, в фонды — социальный налог.',
+      lines: [{ dt: '6410', kt: '4410', s: 15000000, ref: '191.3', c: 1 }, { dt: '6410', kt: '5110', s: 19920000, ref: '226.18', c: 1 }, { dt: '6520', kt: '5110', s: 7920000, ref: '226.19', c: 1 }],
+      w: 'НДС к зачёту: 14 400 000 + 600 000 = 15 000 000 (Дт 6410 Кт 4410). НДС к уплате: 27 000 000 − 15 000 000 = 12 000 000, плюс НДФЛ 7 920 000 — в бюджет 19 920 000 (Дт 6410 Кт 5110). Соцналог: 4 800 000 + 1 200 000 + 1 920 000 = 7 920 000 (Дт 6520 Кт 5110).' },
+    { t: 'Зарплата за вычетом НДФЛ получена в кассу и выплачена работникам.',
+      lines: [{ dt: '5010', kt: '5110', s: 58080000, ref: '226.13', c: 1 }, { dt: '6710', kt: '5010', s: 58080000, ref: '290.12', c: 1 }],
+      w: 'К выплате: 66 000 000 − 7 920 000 = 58 080 000. Сначала деньги из банка в кассу (Дт 5010 Кт 5110), потом из кассы работникам (Дт 6710 Кт 5010).' },
+    { ch: 'Итог месяца', t: 'Для примера считаем, что это итог года: выручка, себестоимость и административные расходы перенесены на 9910.',
+      lines: [{ dt: '9010', kt: '9910', s: 225000000, ref: '436.1', c: 1 }, { dt: '9910', kt: '9110', s: 182000000, ref: '436.2', c: 1 }, { dt: '9910', kt: '9420', s: 17920000, ref: '436.4', c: 1 }],
+      w: 'Доход закрывают по дебету (Дт 9010 Кт 9910), расходы — по кредиту (Дт 9910 Кт 9110, Дт 9910 Кт 9420). Административные: 16 000 000 + 1 920 000 = 17 920 000. Прибыль до налога: 225 000 000 − 182 000 000 − 17 920 000 = 25 080 000.' },
+    { t: 'Начислен налог на прибыль 15% и закрыт на 9910; чистая прибыль перенесена в нераспределённую прибыль.',
+      lines: [{ dt: '9810', kt: '6410', s: 3762000, ref: '275.6', c: 1 }, { dt: '9910', kt: '9810', s: 3762000, ref: '436.9', c: 1 }, { dt: '9910', kt: '8710', s: 21318000, ref: '436.10', c: 1 }],
+      w: 'Налог: 25 080 000 × 15% = 3 762 000 (Дт 9810 Кт 6410), затем 9810 закрываем (Дт 9910 Кт 9810). Чистая прибыль: 25 080 000 − 3 762 000 = 21 318 000 — в капитал (Дт 9910 Кт 8710).' }
+  ],
+  facts: [
+    ['Себестоимость 1 м² воздуховода', B => B.d('2810') / 2500],
+    ['Незавершённое производство на конец месяца', B => B.bal('2010')],
+    ['Выручка без НДС', B => B.k('9010')],
+    ['Прибыль до налога', B => B.k('9010') - B.d('9110') - B.d('9420')],
+    ['Чистая прибыль (8710)', B => -B.bal('8710')],
+    ['Деньги на расчётном счёте', B => B.bal('5110')],
+    ['Должны поставщику энергии', B => -B.bal('6010')],
+    ['Должны бюджету (налог на прибыль)', B => -B.bal('6410')]
+  ] },
 { id: 'mount', ic: 'tool', lvl: 'Средний', tags: ['работы и услуги', 'аванс', 'НДС'],
   title: 'Монтаж вентиляции',
   short: 'Работы по договору: аванс заказчика, затраты на объекте, акт, зачёт аванса.',
@@ -2201,6 +2305,45 @@ const CASES = [
     ['Машины и оборудование на конец (0130)', B => B.bal('0130')],
     ['Деньги на расчётном счёте', B => B.bal('5110')]
   ] },
+{ id: 'lease', ic: 'gear', lvl: 'Составные проводки', tags: ['лизинг', 'проценты', 'износ', 'расчёт сумм'],
+  title: 'Станок в лизинг',
+  short: 'Финансовая аренда: пресс на балансе, долг лизингодателю, проценты, износ и выкуп.',
+  firm: 'ООО «ВентПрофиль» берёт листогибочный пресс за 180 000 000 сум в финансовую аренду (лизинг) на 3 года под 20% годовых. Основной долг гасится равными частями каждый месяц, в конце пресс переходит в собственность фирмы.',
+  goal: 'Как учитывают имущество, которое ещё не наше, но которым мы пользуемся как своим, и как делят лизинговый платёж на основной долг и проценты.',
+  open: [['5110', 400000000], ['8330', -400000000]],
+  steps: [
+    { ch: 'Получение пресса', t: 'Пресс получен по договору финансовой аренды и введён в работу.',
+      lines: [{ dt: '0310', kt: '7910', s: 180000000, ref: '340.1' }],
+      w: 'Пресс принадлежит лизинговой компании, но мы пользуемся им весь срок и потом выкупаем. Поэтому он стоит на нашем балансе как актив 0310 (дебет), а долг лизингодателю — долгосрочное обязательство 7910 (кредит).' },
+    { t: 'Основной долг, который нужно погасить в ближайшие 12 месяцев, переведён в текущую часть.',
+      lines: [{ dt: '7910', kt: '6950', s: 60000000, ref: '340.2', c: 1 }],
+      w: 'Срок — 3 года, долг гасится равными частями: за год 180 000 000 / 3 = 60 000 000. Эту часть переводят из долгосрочных обязательств (Дт 7910) в текущие (Кт 6950).' },
+    { ch: 'Первый месяц', t: 'Начислены проценты за первый месяц: 20% годовых на весь долг.',
+      lines: [{ dt: '9610', kt: '6920', s: 3000000, ref: '40.10', c: 1 }],
+      w: '180 000 000 × 20% / 12 = 3 000 000. Проценты — расход по финансовой деятельности (Дт 9610), пока не заплатили — долг по процентам (Кт 6920).' },
+    { t: 'Начислен износ пресса за месяц: срок полезной службы — 5 лет.',
+      lines: [{ dt: '2010', kt: '0299', s: 3000000, ref: '120.1', c: 1 }],
+      w: '180 000 000 / (5 × 12) = 3 000 000 в месяц. Пресс работает в цехе — износ в затраты производства (Дт 2010). Износ имущества в лизинге копят отдельно, на 0299 (кредит).' },
+    { t: 'Уплачен первый лизинговый платёж: основной долг за месяц и проценты.',
+      lines: [{ dt: '6950', kt: '5110', s: 5000000, ref: '226.25', c: 1 }, { dt: '6920', kt: '5110', s: 3000000, ref: '226.24', c: 1 }],
+      w: 'Платёж состоит из двух частей, поэтому две строки. Основной долг: 60 000 000 / 12 = 5 000 000 (Дт 6950). Проценты: 3 000 000 (Дт 6920). Деньги уходят одной суммой 8 000 000, но в учёте её делят.' },
+    { ch: 'Остальные 35 месяцев', t: 'За следующие 35 месяцев: остаток долгосрочного долга переведён в текущий, начислены проценты по графику — 52 500 000 и износ пресса.',
+      lines: [{ dt: '7910', kt: '6950', s: 120000000, ref: '340.2', c: 1 }, { dt: '9610', kt: '6920', s: 52500000, ref: '40.10' }, { dt: '2010', kt: '0299', s: 105000000, ref: '120.1', c: 1 }],
+      w: 'Чтобы не повторять одно и то же 35 раз, суммы собраны вместе. Долгосрочный остаток: 180 000 000 − 60 000 000 = 120 000 000 (Дт 7910 Кт 6950). Проценты по графику — 52 500 000, их сумма меньше с каждым месяцем, потому что долг уменьшается (Дт 9610 Кт 6920). Износ: 35 × 3 000 000 = 105 000 000 (Дт 2010 Кт 0299).' },
+    { t: 'За эти 35 месяцев уплачены все лизинговые платежи: остаток основного долга и все проценты.',
+      lines: [{ dt: '6950', kt: '5110', s: 175000000, ref: '226.25', c: 1 }, { dt: '6920', kt: '5110', s: 52500000, ref: '226.24', c: 1 }],
+      w: 'Основной долг: 180 000 000 − 5 000 000 = 175 000 000 (Дт 6950 Кт 5110). Проценты: 52 500 000 (Дт 6920 Кт 5110).' },
+    { ch: 'Выкуп', t: 'Договор закончился, пресс перешёл в собственность фирмы. Он переведён в собственные основные средства вместе с накопленным износом.',
+      lines: [{ dt: '0130', kt: '0310', s: 180000000, ref: '23.3' }, { dt: '0299', kt: '0230', s: 108000000, ref: '32.9', c: 1 }],
+      w: 'Теперь пресс наш: из «полученных в финансовую аренду» (Кт 0310) — в «Машины и оборудование» (Дт 0130). Износ переносим с 0299 на 0230: 3 000 000 + 105 000 000 = 108 000 000. Остаточная стоимость пресса: 180 000 000 − 108 000 000 = 72 000 000.' }
+  ],
+  facts: [
+    ['Стоимость пресса', B => B.bal('0130')],
+    ['Проценты за весь срок лизинга', B => B.d('9610')],
+    ['Износ на момент выкупа', B => -B.bal('0230')],
+    ['Остаточная стоимость пресса', B => B.bal('0130') + B.bal('0230')],
+    ['Деньги на расчётном счёте', B => B.bal('5110')]
+  ] },
 { id: 'defect', ic: 'alert', lvl: 'Средний', tags: ['брак', 'недостача', 'излишки', 'инвентаризация'],
   title: 'Брак и инвентаризация',
   short: 'Неисправимый брак, отходы, возмещение ущерба, недостача и излишки.',
@@ -2239,6 +2382,37 @@ const CASES = [
     ['Недостача, списанная в убыток', B => B.d('9430')],
     ['Сталь на складе после инвентаризации', B => B.bal('1010')],
     ['Зарплата к выплате после удержаний', B => -B.bal('6710')]
+  ] },
+{ id: 'profit', ic: 'flag', lvl: 'Составные проводки', tags: ['дивиденды', 'резервный капитал', 'расчёт сумм'],
+  title: 'Распределяем прибыль',
+  short: 'Резервный капитал, дивиденды, налог на дивиденды и нераспределённая прибыль.',
+  firm: 'Год закрыт: чистая прибыль ООО «ВентПрофиль» — 70 000 000 сум. Учредители решили: 10% прибыли — в резервный капитал, 50% — на дивиденды, остальное оставить в фирме.',
+  goal: 'Что происходит с прибылью после закрытия года: как её распределяют и почему дивиденды — это не расход.',
+  open: [['5110', 120000000], ['8330', -50000000], ['8710', -70000000]],
+  openNote: 'На 8710 — чистая прибыль закрытого года.',
+  steps: [
+    { ch: 'Решение учредителей', t: '10% чистой прибыли направлено в резервный капитал.',
+      lines: [{ dt: '8710', kt: '8520', s: 7000000, ref: '365.3', c: 1 }],
+      w: '70 000 000 × 10% = 7 000 000. Прибыль уменьшается (Дт 8710), резервный капитал растёт (Кт 8520). Обе части — собственный капитал, итог баланса не меняется.' },
+    { t: 'Начислены дивиденды учредителям — 50% чистой прибыли.',
+      lines: [{ dt: '8710', kt: '6610', s: 35000000, ref: '365.2', c: 1 }],
+      w: '70 000 000 × 50% = 35 000 000. Дивиденды — не расход фирмы, а раздача прибыли: её уменьшают по дебету 8710. Пока не выплатили — это долг перед учредителями (Кт 6610).' },
+    { ch: 'Выплата', t: 'Удержан налог на дивиденды 5%, дивиденды за вычетом налога перечислены учредителям.',
+      lines: [{ dt: '6610', kt: '6410', s: 1750000, ref: '275.5', c: 1 }, { dt: '6610', kt: '5110', s: 33250000, ref: '226.20', c: 1 }],
+      w: 'Налог: 35 000 000 × 5% = 1 750 000 — фирма удерживает его и должна бюджету (Дт 6610 Кт 6410). На руки учредителям: 35 000 000 − 1 750 000 = 33 250 000 (Дт 6610 Кт 5110). Долг перед учредителями закрыт полностью. Ставку налога сверяйте с действующим Налоговым кодексом.' },
+    { t: 'Налог на дивиденды перечислен в бюджет.',
+      lines: [{ dt: '6410', kt: '5110', s: 1750000, ref: '226.18', c: 1 }],
+      w: 'Долг перед бюджетом погашен (Дт 6410), деньги ушли (Кт 5110).' },
+    { ch: 'Остаток прибыли', t: 'Нераспределённый остаток прибыли года перенесён в накопленную прибыль прошлых лет.',
+      lines: [{ dt: '8710', kt: '8720', s: 28000000, ref: '365.4', c: 1 }],
+      w: '70 000 000 − 7 000 000 − 35 000 000 = 28 000 000. С 8710 «прибыль отчётного года» переносим на 8720 «накопленная прибыль»: так 8710 к новому году обнуляется.' }
+  ],
+  facts: [
+    ['В резервный капитал', B => -B.bal('8520')],
+    ['Учредителям на руки', B => B.d('6610') - B.k('6410')],
+    ['Налог на дивиденды', B => B.k('6410')],
+    ['Осталось в фирме (8720)', B => -B.bal('8720')],
+    ['Деньги на расчётном счёте', B => B.bal('5110')]
   ] },
 { id: 'loan', ic: 'bank', lvl: 'Простой', tags: ['кредит', 'проценты'],
   title: 'Кредит банка',
@@ -2312,21 +2486,110 @@ const CASES = [
   ] }
 ];
 
+// every step gets a list of lines; a one-line step keeps dt/kt/s/ref for the simple screens
+for (const c of CASES) for (const st of c.steps) {
+  if (!st.lines) st.lines = [{ dt: st.dt, kt: st.kt, s: st.s, ref: st.ref }];
+  else { const l = st.lines[0]; st.dt = l.dt; st.kt = l.kt; st.ref = l.ref; st.s = st.lines.reduce((a, x) => a + x.s, 0); }
+  st.multi = st.lines.length > 1 || st.lines.some(l => l.c);
+}
+/* ---------- operations of several lines, with sums to work out: compared as a set, order does not matter ---------- */
+function matchLines(user, exp) {
+  const used = new Set(), res = user.map(() => null);
+  const pass = (test, kind) => user.forEach((u, i) => {
+    if (res[i]) return;
+    const j = exp.findIndex((e, k) => !used.has(k) && test(u, e));
+    if (j >= 0) { used.add(j); res[i] = { j, kind: typeof kind === 'function' ? kind(u, exp[j]) : kind }; }
+  });
+  pass((u, e) => u.dt === e.dt && u.kt === e.kt && u.s === e.s, 'ok');
+  pass((u, e) => u.dt === e.dt && u.kt === e.kt, 'sum');
+  pass((u, e) => u.dt === e.kt && u.kt === e.dt, 'swap');
+  pass((u, e) => u.dt === e.dt || u.kt === e.kt, (u, e) => u.dt === e.dt ? 'kt' : 'dt');
+  user.forEach((u, i) => { if (!res[i]) res[i] = { j: -1, kind: 'bad' }; });
+  const missing = exp.map((e, k) => k).filter(k => !used.has(k));
+  return { res, missing, ok: user.length === exp.length && res.every(r => r.kind === 'ok') };
+}
+function lineNotes(user, exp, m) {
+  const L = l => `Дт ${l.dt} Кт ${l.kt}`, many = user.length > 1;
+  const out = m.res.map((r, i) => {
+    const u = user[i], e = exp[r.j], no = many ? `Строка ${i + 1}: ` : '';
+    if (r.kind === 'ok') return no + `${L(u)} на ${money(u.s)} — верно.`;
+    if (r.kind === 'sum') return no + `счета ${L(u)} верные, но сумма ${money(u.s)}, а нужно ${money(e.s)}.`;
+    if (r.kind === 'swap') return no + `счета верные, но дебет и кредит перепутаны: нужно ${L(e)}.`;
+    if (r.kind === 'kt') return no + `дебет ${u.dt} верно, а по кредиту нужен ${e.kt} «${nm(BY[e.kt])}», у вас ${u.kt}.`;
+    if (r.kind === 'dt') return no + `кредит ${u.kt} верно, а по дебету нужен ${e.dt} «${nm(BY[e.dt])}», у вас ${u.dt}.`;
+    return no + `строки ${L(u)} в этой операции нет.`;
+  });
+  for (const k of m.missing) out.push(`Не хватает строки ${L(exp[k])} на ${money(exp[k].s)}.`);
+  return out;
+}
+function wrongSum(s) {
+  return shuffle([Math.round(s * 1.12), Math.round(s / 1.12), s * 10, Math.round(s / 10), Math.round(s * 0.88)]).find(x => x > 0 && x !== s);
+}
+function caseSetOptions(st) {
+  const exp = st.lines.map(l => ({ dt: l.dt, kt: l.kt, s: l.s }));
+  const key = ls => ls.map(l => `${l.dt}|${l.kt}|${l.s}`).sort().join(';');
+  const opts = [{ lines: exp, ok: true }], seen = new Set([key(exp)]);
+  const usable = c => BY[c] && !BY[c].isGroup && c.length === 4;
+  const add = ls => {
+    if (!ls || !ls.length || opts.length >= 4 || ls.some(l => l.dt === l.kt || !usable(l.dt) || !usable(l.kt))) return;
+    const k = key(ls); if (seen.has(k)) return;
+    seen.add(k); opts.push({ lines: ls, ok: false });
+  };
+  const mod = (i, f) => exp.map((l, k) => k === i ? f(l) : l);
+  const pick = a => a[rnd(a.length)];
+  const calc = st.lines.map((l, i) => l.c ? i : -1).filter(i => i >= 0);
+  const gens = [
+    () => { const i = rnd(exp.length); return mod(i, l => ({ dt: l.kt, kt: l.dt, s: l.s })); },
+    () => { const i = rnd(exp.length), alt = CONFUSE[exp[i].dt]; return alt ? mod(i, l => ({ dt: pick(alt), kt: l.kt, s: l.s })) : null; },
+    () => { const i = rnd(exp.length), alt = CONFUSE[exp[i].kt]; return alt ? mod(i, l => ({ dt: l.dt, kt: pick(alt), s: l.s })) : null; },
+    () => calc.length ? mod(pick(calc), l => ({ dt: l.dt, kt: l.kt, s: wrongSum(l.s) })) : null,
+    () => { if (exp.length < 2) return null; const i = rnd(exp.length); return exp.filter((_, k) => k !== i); }
+  ];
+  for (let t = 0; t < 80 && opts.length < 4; t++) add(pick(gens)());
+  for (let t = 0; t < 80 && opts.length < 4; t++) {
+    const i = rnd(exp.length), fam = SUBS.filter(x => x.grp && x.grp === BY[exp[i].dt].grp && x.code !== exp[i].dt);
+    if (fam.length) add(mod(i, l => ({ dt: pick(fam).code, kt: l.kt, s: l.s })));
+  }
+  return shuffle(opts);
+}
+const setView = ls => h('span', { class: 'lset' }, ls.map(l => h('span', { class: 'lrow' },
+  h('span', { class: 'pp' }, h('span', { class: 'd' }, 'Дт ' + l.dt), ' ', h('span', { class: 'k' }, 'Кт ' + l.kt)),
+  h('span', { class: 'ls' }, money(l.s)),
+  h('span', { class: 'ln' }, `${nm(BY[l.dt])} / ${nm(BY[l.kt])}`))));
+function lineRef(l) {
+  const e = l.ref && ENT_BY[l.ref];
+  if (!e) return `Дт ${l.dt} Кт ${l.kt}: в таблицах Инструкции эта пара отдельно не названа — следует из того же правила.`;
+  const [p, n] = l.ref.split('.');
+  return `Дт ${l.dt} Кт ${l.kt}: Инструкция, п. ${p}, строка ${n} — «${et(e)}».`;
+}
+const answerRows = st => st.lines.map(l => h('div', { class: 'step-p' }, pairView(l.dt, l.kt, [l.dt], [l.kt]), h('span', { class: 'amt sm' }, money(l.s), h('small', null, '\u00a0сум'))));
+const lineRefs = st => h('div', { class: 'refs' }, st.lines.map(l => h('p', { class: 'note' }, lineRef(l))));
+function lineDetails(st, open) {
+  const out = [];
+  st.lines.forEach((l, i) => {
+    const more = h('details', { class: 'more' }, h('summary', null, st.lines.length > 1 ? `Подробный разбор строки ${i + 1}: Дт ${l.dt} Кт ${l.kt}` : 'Подробный разбор: правила и баланс'));
+    const fill = () => { if (more.children.length === 1) { const w = explainView(stepEnt(l), { amt: l.s, noExample: true, id: false }); if (w) more.append(w); } };
+    more.addEventListener('toggle', () => { if (more.open) fill(); });
+    if (open && st.lines.length === 1) { more.open = true; fill(); }
+    out.push(more);
+  });
+  return out;
+}
 /* ---------- mode: practical examples ---------- */
 const nOp = n => pl(n, 'операция', 'операции', 'операций');
 const stepEnt = st => ({ dt: st.dt, kt: st.kt, dc: [st.dt], kc: [st.kt] });
 let CASE_REF = null;
 function caseRefs() {
-  if (!CASE_REF) { CASE_REF = {}; for (const c of CASES) c.steps.forEach((st, i) => { if (st.ref) (CASE_REF[st.ref] || (CASE_REF[st.ref] = [])).push([c, i]); }); }
+  if (!CASE_REF) { CASE_REF = {}; for (const c of CASES) c.steps.forEach((st, i) => st.lines.forEach(l => { if (l.ref) (CASE_REF[l.ref] || (CASE_REF[l.ref] = [])).push([c, i, l]); })); }
   return CASE_REF;
 }
 // a trainer entry that also happens in one of the examples: show it with real sums and a link to the example
 function exampleView(e) {
   const list = e.id && caseRefs()[e.id]; if (!list) return null;
-  const [c, i] = list[0], st = c.steps[i];
+  const [c, i, l] = list[0], st = c.steps[i];
   return h('div', { class: 'ex' },
     h('div', { class: 'ex-h' }, ico(c.ic, 'sm'), h('span', null, h('b', null, 'На примере: '), `${c.title}, операция ${i + 1}`)),
-    h('p', null, st.t, ' ', h('span', { class: 'sum' }, money(st.s) + ' сум'), ` — Дт ${st.dt} Кт ${st.kt}.`),
+    h('p', null, st.t, ' ', h('span', { class: 'sum' }, money(l.s) + ' сум'), ` — Дт ${l.dt} Кт ${l.kt}.`),
     h('p', { class: 'ex-w' }, st.w),
     h('button', { type: 'button', class: 'linkbtn', onclick: () => CaseView.openRead(c.id, i) }, 'Открыть весь пример', ico('next', 'sm')));
 }
@@ -2335,7 +2598,7 @@ function ledger(c, upto) {
   const B = {};
   const g = code => B[code] || (B[code] = { o: 0, d: 0, k: 0 });
   for (const [code, v] of c.open || []) g(code).o += v;
-  c.steps.slice(0, upto == null ? c.steps.length : upto).forEach(st => { g(st.dt).d += st.s; g(st.kt).k += st.s; });
+  c.steps.slice(0, upto == null ? c.steps.length : upto).forEach(st => st.lines.forEach(l => { g(l.dt).d += l.s; g(l.kt).k += l.s; }));
   return B;
 }
 const balOf = x => x ? x.o + x.d - x.k : 0;
@@ -2373,7 +2636,7 @@ function osvView(c) {
 }
 // likely mix-ups for a concrete account: wrong-but-plausible answers
 const CONFUSE = {
-  '0130': ['0230', '0710', '0810'], '0220': ['0120', '2510'], '0230': ['0130', '2010', '2510'], '0710': ['0810', '0130', '1010'], '0810': ['0710', '0130', '2010'],
+  '0130': ['0230', '0710', '0810'], '0310': ['0130', '0710', '0810'], '0299': ['0230', '0310', '2010'], '0220': ['0120', '2510'], '0230': ['0130', '2010', '2510'], '0710': ['0810', '0130', '1010'], '0810': ['0710', '0130', '2010'],
   '1010': ['1020', '2010', '2810', '2910'], '1020': ['1010', '2010', '1090'], '1090': ['1010', '9420', '2610'],
   '2010': ['2510', '9420', '2810', '9110'], '2510': ['2010', '9420', '9410'], '2610': ['2010', '5910', '9430'], '2810': ['2010', '2910', '9110', '1010'], '2910': ['2810', '9120', '1010'],
   '4010': ['6010', '6310', '4310', '5110'], '4220': ['6710', '5010', '4210'], '4320': ['4310', '6010', '0710'], '4410': ['6410', '6010', '9420'], '4610': ['8330', '5110'], '4730': ['5910', '6710', '9430'],
@@ -2382,7 +2645,8 @@ const CONFUSE = {
   '6810': ['7810', '6920', '9610'], '6920': ['9610', '6810'], '8330': ['4610', '8710'], '8710': ['9910', '8720', '8330'],
   '9010': ['9110', '9030', '4010'], '9020': ['9120', '9010', '2910'], '9030': ['9130', '9010', '6310'], '9050': ['9020', '9040', '4010'],
   '9110': ['9010', '2810', '2010'], '9120': ['9020', '2910'], '9130': ['9030', '2010'], '9210': ['9310', '9430', '0130'], '9310': ['9210', '9390'],
-  '9390': ['9310', '8530'], '9410': ['9420', '2510'], '9420': ['9410', '2510', '2010'], '9430': ['9420', '9210'], '9610': ['6920', '9420'], '9810': ['6410', '9910'], '9910': ['8710', '9010', '9110']
+  '9390': ['9310', '8530'], '9410': ['9420', '2510'], '9420': ['9410', '2510', '2010'], '9430': ['9420', '9210'], '9610': ['6920', '9420'], '9810': ['6410', '9910'], '9910': ['8710', '9010', '9110'],
+  '6610': ['6410', '8710', '6710'], '6950': ['7910', '6810', '6920'], '7910': ['6950', '7810', '6010'], '8520': ['8710', '8720', '8330'], '8720': ['8710', '8520']
 };
 function caseOptions(st) {
   const opts = [{ dt: st.dt, kt: st.kt, ok: true }], seen = new Set([st.dt + '|' + st.kt]);
@@ -2397,6 +2661,7 @@ function caseOptions(st) {
   add(st.kt, st.dt);
   for (const [d, k] of shuffle([...nd.slice(0, 2).map(x => [x, st.kt]), ...nk.slice(0, 2).map(x => [st.dt, x])])) add(d, k);
   for (const d of nd) for (const k of nk) add(d, k);
+  for (const x of shuffle(SUBS.filter(a => a.sec === BY[st.dt].sec && a.code !== st.dt))) add(x.code, st.kt);
   return shuffle(opts).map(o => Object.assign(o, { dc: [o.dt], kc: [o.kt] }));
 }
 const CaseView = {
@@ -2482,6 +2747,7 @@ const CaseView = {
     const [sh, inn] = sheet(); m.append(sh);
     if (s.done) return this.summary(inn, c, s);
     const n = c.steps.length, st = c.steps[s.i];
+    if (st.multi) return this.solveMulti(inn, c, s, st, n);
     if (!this.q || this.q.i !== s.i || this.q.cid !== c.id) this.q = { cid: c.id, i: s.i, mode: P.entInput, opts: P.entInput === 'choice' ? caseOptions(st) : null, done: false, dt: '', kt: '' };
     const q = this.q;
     inn.append(...qhead('Операция', { i: s.i, n, res: s.res.filter(x => x != null).map(ok => ({ ok })) }));
@@ -2511,13 +2777,82 @@ const CaseView = {
     inn.append(dock({ ok: q.ok, text: q.ok ? 'Верно!' : q.gave ? 'Ответ показан' : 'Неверно' },
       h('button', { type: 'button', class: 'btn pri', id: 'next', onclick: () => this.advance() }, s.i + 1 >= n ? 'Итоги примера' : 'Дальше', ico('next'))));
   },
+  solveMulti(inn, c, s, st, n) {
+    if (!this.q || this.q.i !== s.i || this.q.cid !== c.id) this.q = { cid: c.id, i: s.i, multi: true, mode: P.entInput, opts: P.entInput === 'choice' ? caseSetOptions(st) : null, lines: st.lines.map(() => ({ dt: '', kt: '', s: null })), done: false };
+    const q = this.q, N = st.lines.length, calc = st.lines.some(l => l.c);
+    inn.append(...qhead('Операция', { i: s.i, n, res: s.res.filter(x => x != null).map(ok => ({ ok })) }));
+    inn.append(h('div', { class: 'prompt' }, h('div', { class: 'ask' }, `${this.chapter(c, s.i)} · ${c.title}`), h('div', { class: 'txt' }, st.t),
+      h('div', { class: 'mchips' }, h('span', null, N > 1 ? `Строк в проводке: ${N}` : 'Одна строка'), calc ? h('span', { class: 'calc' }, 'Суммы считаете сами') : null),
+      h('div', { class: 'hint' }, q.mode === 'choice' ? 'Выберите верный набор строк — счета и суммы.' : N > 1 ? 'Заполните каждую строку: дебет, кредит и сумму. Порядок строк не важен.' : 'Поставьте дебет и кредит и впишите сумму.'),
+      q.done ? null : answerBar(q.mode, md => this.switchMode(md))));
+    if (q.mode === 'choice') {
+      const grid = h('div', { class: 'opts one' });
+      q.opts.forEach((o, k) => {
+        const b = h('button', { type: 'button', class: 'opt', onclick: () => this.choose(k) }, h('span', { class: 'ix' }, k + 1), h('span', { class: 'v' }, setView(o.lines)));
+        if (q.done) { b.disabled = true; b.classList.add(o.ok ? 'ok' : k === q.pick ? 'bad' : 'dim'); }
+        grid.append(b);
+      });
+      inn.append(grid);
+    } else {
+      inn.append(h('div', { class: 'lcards' }, q.lines.map((L, i) => this.lineCard(q, L, i, N))));
+      if (!q.done) inn.append(h('div', { class: 'actions' },
+        h('button', { type: 'button', class: 'btn pri', id: 'check', disabled: !this.ready() || null, onclick: () => this.submitMulti() }, 'Проверить'),
+        h('button', { type: 'button', class: 'btn ghost', onclick: () => { q.gave = true; q.m = null; this.finish(false); } }, 'Не знаю — показать ответ')));
+    }
+    if (!q.done) { if (q.mode === 'choice') inn.append(h('p', { class: 'kbd' }, 'Клавиши 1–4 — выбрать ответ')); return; }
+    const user = q.mode === 'choice' ? (q.pick != null ? q.opts[q.pick].lines : null) : q.lines;
+    const fb = h('div', { class: 'fb ' + (q.ok ? 'ok' : 'bad'), id: 'fb' }, h('h3', null, ico(q.ok ? 'check' : 'cross'), q.ok ? 'Верно!' : q.gave ? 'Правильная проводка' : 'Неверно. Правильная проводка:'));
+    fb.append(...answerRows(st));
+    if (!q.ok && !q.gave && user && q.m) fb.append(h('ul', { class: 'lnotes' }, lineNotes(user, st.lines, q.m).map(t => h('li', null, t))));
+    fb.append(h('div', { class: 'why', id: 'why' }, h('h4', null, 'Разбор операции'), h('p', { class: 'why-plain' }, st.w)), ...lineDetails(st, true), lineRefs(st));
+    inn.append(fb);
+    inn.append(dock({ ok: q.ok, text: q.ok ? 'Верно!' : q.gave ? 'Ответ показан' : 'Неверно' },
+      h('button', { type: 'button', class: 'btn pri', id: 'next', onclick: () => this.advance() }, s.i + 1 >= n ? 'Итоги примера' : 'Дальше', ico('next'))));
+  },
+  lineCard(q, L, i, N) {
+    const r = q.done && q.m && q.mode === 'input' ? q.m.res[i] : null;
+    const dOk = r ? ['ok', 'sum', 'kt'].includes(r.kind) : null, kOk = r ? ['ok', 'sum', 'dt'].includes(r.kind) : null, sOk = r ? r.kind === 'ok' : null;
+    const slot = side => {
+      const code = side === 'd' ? L.dt : L.kt, a = code && BY[code], res = side === 'd' ? dOk : kOk;
+      return h('button', { type: 'button', id: `slot-${side}-${i}`, class: 'slot sm ' + side + (a ? ' full' : '') + (res === true ? ' ok' : res === false ? ' bad' : ''), disabled: q.done || null,
+          onclick: () => this.placeLine(i, side), 'aria-label': `Строка ${i + 1}, ${side === 'd' ? 'дебет' : 'кредит'}: ${a ? a.code + ' ' + nm(a) : 'выбрать счёт'}` },
+        h('span', { class: 'sl' }, side === 'd' ? 'Дебет' : 'Кредит', res != null ? ico(res ? 'check' : 'cross', 'sm') : null),
+        a ? h('span', { class: 'sv' }, h('span', { class: 'cc' }, a.code), h('span', { class: 'nn' }, nm(a))) : h('span', { class: 'sv ph' }, ico('search', 'sm'), q.done ? '—' : 'Выбрать'));
+    };
+    const amt = h('input', { id: 'amt-' + i, class: 'inp amt-in' + (sOk === true ? ' okb' : sOk === false ? ' badb' : ''), inputmode: 'numeric', autocomplete: 'off', placeholder: 'сумма', 'aria-label': `Сумма строки ${i + 1}`, value: L.s ? money(L.s) : '', disabled: q.done || null });
+    amt.addEventListener('input', () => { L.s = +amt.value.replace(/\D/g, '') || null; this.updCheck(); });
+    amt.addEventListener('blur', () => { if (L.s) amt.value = money(L.s); });
+    amt.addEventListener('keydown', ev => { if (ev.key !== 'Enter') return; ev.preventDefault(); ev.stopPropagation(); const nx = $('#amt-' + (i + 1)); if (nx) nx.focus(); else if (this.ready()) this.submitMulti(); });
+    const canSwap = !q.done && L.dt && L.kt;
+    return h('div', { class: 'lcard' + (r ? (r.kind === 'ok' ? ' ok' : ' bad') : '') },
+      N > 1 || canSwap ? h('div', { class: 'lh' }, h('span', null, N > 1 ? `Строка ${i + 1}` : ''),
+        canSwap ? h('button', { type: 'button', class: 'linkbtn', onclick: () => { [L.dt, L.kt] = [L.kt, L.dt]; this.render(); } }, '⇅ поменять местами') : null) : null,
+      h('div', { class: 'slots two' }, slot('d'), slot('k')),
+      h('label', { class: 'amt-row' }, h('span', null, 'Сумма'), amt, h('span', null, 'сум')));
+  },
+  ready() { const q = this.q; return !!(q && q.lines && q.lines.every(l => l.dt && l.kt && l.s > 0)); },
+  updCheck() { const b = $('#check'); if (b) b.disabled = !this.ready(); },
+  placeLine(i, side) {
+    const q = this.q; if (!q || q.done) return;
+    const L = q.lines[i];
+    pickAccount(side, side === 'd' ? L.dt : L.kt, code => {
+      if (code && this.q === q) { L[side === 'd' ? 'dt' : 'kt'] = code; this.render(); }
+      const nx = side === 'd' && !L.kt ? `#slot-k-${i}` : !L.s ? `#amt-${i}` : this.ready() ? '#check' : null;
+      if (nx) $(nx)?.focus({ preventScroll: true });
+    });
+  },
+  submitMulti() {
+    const q = this.q, c = this.c; if (!q || q.done || !c || !this.ready()) return;
+    q.m = matchLines(q.lines, c.steps[q.i].lines);
+    this.finish(q.m.ok);
+  },
   finish(ok) {
     const c = this.c, s = c && this.st(c.id), q = this.q; if (!s || !q || q.done) return;
     q.done = true; q.ok = ok; s.res[s.i] = ok; save();
     announce(ok ? 'Верно' : `Неверно. Правильная проводка: дебет ${c.steps[s.i].dt}, кредит ${c.steps[s.i].kt}`);
     this.render(); focusNext(); revealFeedback();
   },
-  choose(k) { const q = this.q; if (!q || q.done || !q.opts) return; q.pick = k; this.finish(q.opts[k].ok); },
+  choose(k) { const q = this.q; if (!q || q.done || !q.opts) return; q.pick = k; if (q.multi) q.m = matchLines(q.opts[k].lines, this.c.steps[q.i].lines); this.finish(q.opts[k].ok); },
   submit() {
     const q = this.q, c = this.c; if (!q || q.done || !c) return;
     if (!q.dt || !q.kt) { this.place(!q.dt ? 'd' : 'k'); return; }
@@ -2536,7 +2871,7 @@ const CaseView = {
   switchMode(md) {
     setPref('entInput', md);
     const q = this.q, c = this.c;
-    if (q && !q.done && q.mode !== md && c) { q.mode = md; q.opts = md === 'choice' ? caseOptions(c.steps[q.i]) : null; }
+    if (q && !q.done && q.mode !== md && c) { q.mode = md; q.opts = md === 'choice' ? (q.multi ? caseSetOptions(c.steps[q.i]) : caseOptions(c.steps[q.i])) : null; }
     this.render(); this.after();
   },
   advance() {
@@ -2553,7 +2888,7 @@ const CaseView = {
     const wrong = s.res.map((x, i) => x === false ? i : -1).filter(i => i >= 0);
     if (wrong.length) inn.append(h('p', { class: 'note' }, 'Ошибки — нажмите, чтобы прочитать разбор:'),
       h('ul', { class: 'wlist' }, wrong.map(i => h('li', null, h('button', { type: 'button', onclick: () => this.openRead(c.id, i) },
-        h('span', { class: 'cc' }, `${i + 1} · Дт ${c.steps[i].dt} Кт ${c.steps[i].kt}`), h('span', null, c.steps[i].t))))));
+        h('span', { class: 'cc' }, `${i + 1} · Дт ${c.steps[i].dt} Кт ${c.steps[i].kt}` + (c.steps[i].lines.length > 1 ? ` + ещё ${c.steps[i].lines.length - 1}` : '')), h('span', null, c.steps[i].t))))));
     inn.append(h('div', { class: 'actions' }, h('button', { type: 'button', class: 'btn sm', onclick: () => this.show(c.id, 'read') }, ico('eye', 'sm'), 'Читать решение целиком')));
     inn.append(h('h3', { class: 'h3c' }, 'Что получилось'), factsView(c),
       h('h3', { class: 'h3c' }, 'Оборотно-сальдовая ведомость'), h('p', { class: 'note' }, 'По каждому счёту: остаток на начало, обороты по дебету и кредиту за все операции, остаток на конец. Сумма дебетовых остатков всегда равна сумме кредитовых.'), osvView(c));
@@ -2568,6 +2903,11 @@ const CaseView = {
     if (c.open.length) inn.append(h('details', { class: 'more' }, h('summary', null, 'Остатки на начало'), openView(c), c.openNote ? h('p', { class: 'note' }, c.openNote) : null));
     c.steps.forEach((st, i) => {
       if (st.ch) inn.append(h('h3', { class: 'h3c' }, st.ch));
+      if (st.multi) {
+        inn.append(h('article', { class: 'step' + (this.at === i ? ' hl' : ''), id: 'st-' + i },
+          h('div', { class: 'step-h' }, h('span', { class: 'no' }, i + 1), h('span', null, st.t)), ...answerRows(st), h('p', { class: 'step-w' }, st.w), lineRefs(st), ...lineDetails(st, false)));
+        return;
+      }
       const more = h('details', { class: 'more' }, h('summary', null, 'Подробный разбор: правила и баланс'));
       more.addEventListener('toggle', () => { if (more.open && more.children.length === 1) { const w = explainView(stepEnt(st), { amt: st.s, sal: stepSal(c, i), noExample: true, id: false }); if (w) more.append(w); } });
       inn.append(h('article', { class: 'step' + (this.at === i ? ' hl' : ''), id: 'st-' + i },
@@ -2587,7 +2927,7 @@ const CaseView = {
     if (!typing && q && !q.done && q.mode === 'choice' && /^[1-4]$/.test(e.key)) { e.preventDefault(); this.choose(+e.key - 1); }
     else if (!typing && e.key === 'Enter' && q && q.done && document.activeElement?.id !== 'next') { e.preventDefault(); $('#next')?.click(); }
   },
-  after() { const q = this.q; if (this.sub === 'solve' && q && !q.done && q.mode === 'input') { const b = $(q.dt && q.kt ? '#check' : !q.dt ? '#slot-d' : '#slot-k'); if (b) { b.focus({ preventScroll: true }); return true; } } return false; }
+  after() { const q = this.q; if (this.sub === 'solve' && q && !q.done && q.mode === 'input') { const b = q.multi ? $('.lcard .slot:not(.full)') || $('#check') : $(q.dt && q.kt ? '#check' : !q.dt ? '#slot-d' : '#slot-k'); if (b) { b.focus({ preventScroll: true }); return true; } } return false; }
 };
 
 /* ---------- shell ---------- */
