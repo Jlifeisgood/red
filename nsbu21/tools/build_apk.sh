@@ -3,8 +3,9 @@
 # usage: nsbu21/tools/build_apk.sh <keystore.p12> <password> <alias> [out.apk]
 # needs: python3, a JDK (javac, java), curl
 set -euo pipefail
+abs() { case "$1" in /*) echo "$1" ;; *) echo "$PWD/$1" ;; esac; }
+ks="$(abs "$1")"; pass="$2"; alias="$3"; out="$(abs "${4:-NSBU21.apk}")"
 cd "$(dirname "$0")/.."
-ks="$1"; pass="$2"; alias="$3"; out="${4:-NSBU21.apk}"
 build="$(mktemp -d)"
 jar="$build/apksig-2.3.0.jar"
 curl -fsSL -o "$jar" https://repo1.maven.org/maven2/com/android/tools/build/apksig/2.3.0/apksig-2.3.0.jar

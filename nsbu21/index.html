@@ -493,6 +493,44 @@ details.howto{margin-top:12px}
 .wlist .cc{font:700 12px var(--f-mono);color:var(--bad)}
 @media (hover:hover){.wlist button:hover{border-color:var(--accent)}}
 
+/* placing the accounts yourself */
+.amode{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:12px;font-size:13px;color:var(--muted)}
+.amode .seg button{padding:6px 13px;font-size:13px}
+.slots{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:560px){.slots{grid-template-columns:1fr}}
+.slot{display:grid;gap:8px;justify-items:start;align-content:start;width:100%;min-height:84px;padding:11px 14px 13px;text-align:left;border:1.5px dashed var(--rule);border-radius:12px;background:var(--sheet);color:var(--ink)}
+.slot .sl{display:inline-flex;align-items:center;gap:4px;padding:0 8px;border-radius:5px;font:700 11px/1.75 var(--f-body);letter-spacing:.02em}
+.slot.d .sl{background:var(--dt-bg);color:var(--dt)} .slot.k .sl{background:var(--kt-bg);color:var(--kt)}
+.slot .sv{display:flex;flex-wrap:wrap;gap:2px 10px;align-items:baseline;min-width:0}
+.slot .sv .cc{font:700 22px/1.1 var(--f-mono);letter-spacing:.03em}
+.slot .sv .nn{flex:1 1 120px;min-width:0;color:var(--muted);font-size:14px;overflow-wrap:anywhere}
+.slot .sv.ph{align-items:center;gap:6px;color:var(--accent);font-weight:600;font-size:15px}
+.slot.full{border-style:solid}
+.slot.d.full{border-color:color-mix(in srgb,var(--dt) 55%,transparent)} .slot.k.full{border-color:color-mix(in srgb,var(--kt) 55%,transparent)}
+.slot.ok{border-color:var(--ok);background:var(--ok-bg)} .slot.bad{border-color:var(--bad);background:var(--bad-bg)}
+.slot.ok .sl svg.i{color:var(--ok)} .slot.bad .sl svg.i{color:var(--bad)}
+.slot[disabled]{cursor:default}
+@media (hover:hover){.slot:hover:not([disabled]){border-color:var(--accent)}}
+.btn[disabled]{opacity:.45;cursor:default}
+.ov-panel.pick{height:min(86vh,780px)}
+.ov-panel.pick .ov-body{padding-top:0}
+.psearch{position:sticky;top:0;z-index:2;margin:0 -20px;padding:10px 20px 8px;background:var(--sheet)}
+.psearch svg.i{left:34px}
+.psec{margin:16px 0 6px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.pk-rows{border:1px solid var(--rule);border-radius:12px;overflow:hidden}
+.pk-row{display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:10px;align-items:baseline;width:100%;min-height:46px;padding:10px 12px;border:0;border-top:1px solid var(--line);background:var(--sheet);text-align:left;color:inherit;font-size:14px}
+.pk-rows > :first-child{border-top:0}
+.pk-row .cc{font:700 14px var(--f-mono)}
+.pk-row .nm{min-width:0;overflow-wrap:anywhere}
+.pk-row.grp{background:var(--sheet-2);font-weight:600}
+.pk-row.grp svg.i{align-self:center;color:var(--faint)}
+.pk-row.pk-in{padding-left:24px}
+.pk-row.cur{background:var(--accent-2)}
+@media (hover:hover){.pk-row:hover{background:var(--accent-2)}}
+.pchips{display:flex;flex-wrap:wrap;gap:6px}
+.pchips .chip{max-width:100%;white-space:normal;text-align:left;color:var(--ink)}
+.pchips .chip b{font-family:var(--f-mono)}
+
 .foot{margin-top:30px;color:var(--muted);font-size:12px;line-height:1.6;max-width:80ch}
 .loading{padding:40px 0;color:var(--muted)}
 
@@ -520,6 +558,7 @@ details.howto{margin-top:12px}
   .dock.fill .btn{flex:1 1 0;padding-inline:12px}
   .opt{min-height:56px}
   .ov{align-items:flex-end;padding:0}
+  .ov-panel.pick{height:90vh}
   .ov-panel{width:100%;max-height:90vh;border-radius:20px 20px 0 0;border-bottom:0;transform:translateY(48px)}
   .ov-head{padding-top:22px}
   .ov-head::before{content:"";position:absolute;top:8px;left:50%;width:36px;height:4px;margin-left:-18px;border-radius:2px;background:var(--rule)}
@@ -619,7 +658,7 @@ let store = { prefs: {}, st: {}, rounds: {}, cases: {} };
 try { const raw = localStorage.getItem(KEY); if (raw) { const o = JSON.parse(raw); if (o && typeof o === 'object') store = { prefs: o.prefs || {}, st: o.st || {}, rounds: o.rounds || {}, cases: o.cases && typeof o.cases === 'object' ? o.cases : {} }; } } catch (e) {}
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) {} };
 const ALL_SECS = ['lta', 'ca', 'cl', 'ltl', 'eq', 'ie', 'off'];
-const P = Object.assign({ lang: 'ru', scope: 'secs', secs: ALL_SECS.slice(), focus: null, groups: false, kinds: ['name', 'code', 'type'], entSet: 'basic', entInput: 'choice', cardDir: 'code', autoNext: true, entAuto: false, len: 10, last: null }, store.prefs);
+const P = Object.assign({ lang: 'ru', scope: 'secs', secs: ALL_SECS.slice(), focus: null, groups: false, kinds: ['name', 'code', 'type'], entSet: 'basic', entInput: 'input', cardDir: 'code', autoNext: true, entAuto: false, len: 10, last: null }, store.prefs);
 if (!Array.isArray(P.secs) || !P.secs.length) P.secs = ALL_SECS.slice();
 if (!Array.isArray(P.kinds) || !P.kinds.length) P.kinds = ['name', 'code', 'type'];
 if (![10, 20, 30].includes(P.len)) P.len = 10;
@@ -1256,15 +1295,16 @@ function toSheetTop() { const s = $('.sheet'); if (s && s.getBoundingClientRect(
 /* ---------- settings sheet ---------- */
 const Sheet = {
   node: null, onClose: null, prev: null, done: null, note: null,
-  open(title, build, onClose) {
+  open(title, build, onClose, opts = {}) {
     this.close(true);
     this.prev = document.activeElement;
     const body = h('div', { class: 'ov-body' });
-    this.done = h('button', { type: 'button', class: 'btn pri block', onclick: () => this.close() }, 'Готово');
-    this.note = h('p', { class: 'ov-note' });
-    const panel = h('div', { class: 'ov-panel', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'ov-t', tabindex: '-1' },
+    const foot = opts.foot !== false;
+    this.done = foot ? h('button', { type: 'button', class: 'btn pri block', onclick: () => this.close() }, 'Готово') : null;
+    this.note = foot ? h('p', { class: 'ov-note' }) : null;
+    const panel = h('div', { class: 'ov-panel' + (opts.cls ? ' ' + opts.cls : ''), role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'ov-t', tabindex: '-1' },
       h('div', { class: 'ov-head' }, h('h2', { id: 'ov-t' }, title), h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Закрыть', onclick: () => this.close() }, ico('close'))),
-      body, h('div', { class: 'ov-foot' }, this.note, this.done));
+      body, foot ? h('div', { class: 'ov-foot' }, this.note, this.done) : null);
     this.node = h('div', { class: 'ov' }, h('div', { class: 'ov-bg', onclick: () => this.close() }), panel);
     this.onClose = onClose;
     build(body);
@@ -1343,12 +1383,12 @@ function buildSettings(mode, body) {
       radio('entSet', 'basic', 'Основные — ' + ENT.filter(e => e.b).length, 'самые частые операции; лучше начать с них'),
       radio('entSet', 'all', 'Все из Инструкции — ' + ENT.length, 'все однозначные проводки из таблиц корреспонденций')));
     body.append(grp('Как отвечать',
-      radio('entInput', 'choice', 'Выбрать из 4 вариантов', 'проще и быстрее, удобно на телефоне'),
-      radio('entInput', 'input', 'Ввести коды счетов', 'сложнее: коды нужно вспомнить самому')));
+      radio('entInput', 'input', 'Ставлю счета сам', 'операция дана, а счёт дебета и счёт кредита вы выбираете сами из плана счетов — поиском или по группам'),
+      radio('entInput', 'choice', 'Выбрать из 4 вариантов', 'готовые пары счетов — нужно найти верную')));
   }
   if (mode === 'cases') body.append(grp('Как отвечать',
-    radio('entInput', 'choice', 'Выбрать из 4 вариантов', 'проще и быстрее, удобно на телефоне'),
-    radio('entInput', 'input', 'Ввести коды счетов', 'сложнее: коды нужно вспомнить самому')));
+    radio('entInput', 'input', 'Ставлю счета сам', 'операция дана, а счёт дебета и счёт кредита вы выбираете сами из плана счетов'),
+    radio('entInput', 'choice', 'Выбрать из 4 вариантов', 'готовые пары счетов — нужно найти верную')));
   else body.append(grp('Что учить', scopeControls(redraw)));
   if (mode !== 'cards' && mode !== 'cases') body.append(grp('Раунд',
     h('div', { class: 'segrow' }, h('span', null, 'Вопросов'), segBtns('seg', [10, 20, 30].map(v => [String(v), P.len === v, () => { setPref('len', v); redraw(); }, 'len:' + v]))),
@@ -1371,7 +1411,8 @@ function openSettings(mode) {
     if (!Object.keys(P).some(ch)) return;
     if (['scope', 'secs', 'focus', 'groups'].some(ch)) resetRounds();
     if (mode === 'test' && ['kinds', 'len'].some(ch)) { TestView.r = null; delete store.rounds.test; save(); }
-    if (mode === 'entries' && ['entSet', 'entInput', 'len'].some(ch)) { EntView.r = null; delete store.rounds.entries; save(); }
+    if (mode === 'entries' && ['entSet', 'len'].some(ch)) { EntView.r = null; delete store.rounds.entries; save(); }
+    else if (mode === 'entries' && ch('entInput')) EntView.switchMode(P.entInput, true);
     if (mode === 'cases' && ch('entInput') && CaseView.q && !CaseView.q.done) CaseView.q = null;
     if (ch('cardDir')) CardsView.flipped = false;
     VIEW.enter();
@@ -1651,39 +1692,84 @@ function entOptions(e) {
   for (const x of shuffle(ENT.slice())) { if (opts.length >= 4) break; add(x.dt, x.kt); }
   return shuffle(opts);
 }
-function suggestField(id, side, label, q, onPick) {
-  const wrap = h('div', { class: 'sugg ' + side });
-  const inp = h('input', { id, class: 'inp wide', autocomplete: 'off', enterkeyhint: side === 'd' ? 'next' : 'done', placeholder: 'код или слово из названия', 'aria-label': label, value: q[side === 'd' ? 'dt' : 'kt'] || '' });
-  const list = h('ul', { hidden: true, role: 'listbox' });
-  const nameBox = h('div', { class: 'sel-name' });
-  let items = [], act = -1;
-  const showName = () => { const a = BY[inp.value.trim()]; nameBox.textContent = a ? nm(a) : ''; };
-  const close = () => { list.hidden = true; act = -1; };
-  const choose = a => { inp.value = a.code; close(); showName(); onPick && onPick(); };
-  const draw = () => {
-    list.replaceChildren(...items.map((a, i) => h('li', null, h('button', { type: 'button', class: i === act ? 'act' : '', onmousedown: ev => { ev.preventDefault(); choose(a); } }, h('span', { class: 'cc' }, a.code), h('span', null, nm(a))))));
-    list.hidden = !items.length;
+/* ---------- placing the accounts yourself: two slots and a picker over the whole chart ---------- */
+function answerBar(cur, onSwitch) {
+  return h('div', { class: 'amode' }, h('span', null, 'Как отвечать:'),
+    segBtns('seg', [['Из вариантов', cur === 'choice', () => onSwitch('choice'), 'am:choice'], ['Ставлю сам', cur !== 'choice', () => onSwitch('input'), 'am:input']]));
+}
+function placeView(q, onPlace, onSwap, onCheck, onGiveUp) {
+  const slot = side => {
+    const code = side === 'd' ? q.dt : q.kt, a = code && BY[code];
+    const res = q.done ? (side === 'd' ? q.okD : q.okK) : null;
+    return h('button', { type: 'button', id: 'slot-' + side, class: 'slot ' + side + (a ? ' full' : '') + (res === true ? ' ok' : res === false ? ' bad' : ''),
+        disabled: q.done || null, onclick: () => onPlace(side), 'aria-label': (side === 'd' ? 'Дебет: ' : 'Кредит: ') + (a ? `${a.code} ${nm(a)}` : 'выбрать счёт') },
+      h('span', { class: 'sl' }, side === 'd' ? 'Дебет' : 'Кредит', res != null ? ico(res ? 'check' : 'cross', 'sm') : null),
+      a ? h('span', { class: 'sv' }, h('span', { class: 'cc' }, a.code), h('span', { class: 'nn' }, nm(a)))
+        : h('span', { class: 'sv ph' }, ico('search', 'sm'), q.done ? 'не выбран' : 'Выбрать счёт'));
   };
-  inp.addEventListener('input', () => {
-    const v = norm(inp.value); showName();
-    if (!v) { items = []; close(); return; }
-    items = /^\d+$/.test(v) ? SUBS.filter(a => a.code.startsWith(v)).slice(0, 8)
-      : SUBS.filter(a => norm(a.ru).includes(v) || norm(a.uz).includes(v)).slice(0, 8);
-    if (items.length === 1 && items[0].code === v) items = [];
-    act = -1; draw();
-  });
-  inp.addEventListener('keydown', ev => {
-    if (!list.hidden && items.length) {
-      if (ev.key === 'ArrowDown') { ev.preventDefault(); act = (act + 1) % items.length; draw(); return; }
-      if (ev.key === 'ArrowUp') { ev.preventDefault(); act = (act - 1 + items.length) % items.length; draw(); return; }
-      if (ev.key === 'Enter' && (act >= 0 || !/^\d{3,4}$/.test(inp.value.trim()))) { ev.preventDefault(); ev.stopPropagation(); choose(items[Math.max(act, 0)]); return; }
-      if (ev.key === 'Escape') { ev.stopPropagation(); close(); return; }
-    }
-  });
-  inp.addEventListener('blur', () => setTimeout(close, 120));
-  showName();
-  wrap.append(h('label', { for: id }, label), inp, list, nameBox);
-  return [wrap, inp];
+  const out = [h('div', { class: 'slots' }, slot('d'), slot('k'))];
+  if (!q.done) out.push(h('div', { class: 'actions' },
+    h('button', { type: 'button', class: 'btn pri', id: 'check', disabled: !(q.dt && q.kt) || null, onclick: onCheck }, 'Проверить'),
+    q.dt && q.kt ? h('button', { type: 'button', class: 'btn', onclick: onSwap, title: 'Поменять дебет и кредит местами' }, '⇅ Поменять местами') : null,
+    h('button', { type: 'button', class: 'btn ghost', onclick: onGiveUp }, 'Не знаю — показать ответ')));
+  return out;
+}
+// what exactly went wrong in a self-placed entry
+function placedNotes(q, e) {
+  if (q.gave || q.ok) return [];
+  if (e.dc.includes(q.kt) && e.kc.includes(q.dt)) return ['Счета выбраны верно, но стоят наоборот: дебет и кредит перепутаны. Такая проводка означала бы обратную операцию.'];
+  const parts = [];
+  if (q.okD) parts.push(`Дебет ${q.dt} — верно.`);
+  else parts.push(`По дебету вы поставили ${q.dt} «${nm(BY[q.dt])}», а нужен ${e.dt} «${codesLabel(e.dc)}».`);
+  if (q.okK) parts.push(`Кредит ${q.kt} — верно.`);
+  else parts.push(`По кредиту вы поставили ${q.kt} «${nm(BY[q.kt])}», а нужен ${e.kt} «${codesLabel(e.kc)}».`);
+  const m = choiceMeaning({ dt: q.dt, kt: q.kt, dc: [q.dt], kc: [q.kt] }, e);
+  return [parts.join(' '), m].filter(Boolean);
+}
+// a bottom sheet with every balance-sheet subaccount: search by code or word, or open a group
+function pickAccount(side, cur, onPick) {
+  let picked = null, query = '';
+  const open = new Set(cur && BY[cur] && BY[cur].grp ? [BY[cur].grp] : []);
+  const choose = code => { picked = code; setPref('recent', [code, ...(P.recent || []).filter(x => x !== code)].slice(0, 8)); Sheet.close(); };
+  const row = (a, sub) => h('button', { type: 'button', class: 'pk-row' + (sub ? ' pk-in' : '') + (a.code === cur ? ' cur' : ''), onclick: () => choose(a.code) },
+    h('span', { class: 'cc' }, a.code), h('span', { class: 'nm' }, nm(a)));
+  Sheet.open(side === 'd' ? 'Какой счёт по дебету?' : 'Какой счёт по кредиту?', body => {
+    const inp = h('input', { class: 'search', type: 'search', placeholder: 'Код или слово: касса, 6010…', 'aria-label': 'Поиск счёта по коду или названию', enterkeyhint: 'search', autocomplete: 'off' });
+    const list = h('div', { class: 'plist' });
+    const draw = () => {
+      const q = norm(query);
+      list.replaceChildren();
+      if (q) {
+        const hits = SUBS.filter(a => a.sec !== 'off' && (a.code.startsWith(q) || norm(a.ru).includes(q) || norm(a.uz).includes(q))).slice(0, 60);
+        list.append(hits.length ? h('div', { class: 'pk-rows' }, hits.map(a => row(a))) : h('p', { class: 'note' }, 'Ничего не найдено. Попробуйте код (например, 5110) или другое слово.'));
+        return;
+      }
+      const rec = (P.recent || []).filter(c => BY[c] && !BY[c].isGroup);
+      if (rec.length) list.append(h('div', { class: 'psec' }, 'Недавние'), h('div', { class: 'pchips' }, rec.map(c => h('button', { type: 'button', class: 'chip', onclick: () => choose(c) }, h('b', null, c), ' ', nm(BY[c])))));
+      for (const s of SECS) {
+        if (s.id === 'off') continue;
+        const rows = h('div', { class: 'pk-rows' });
+        for (const g of GROUPS.filter(x => x.sec === s.id)) {
+          const isOpen = open.has(g.code);
+          rows.append(h('button', { type: 'button', class: 'pk-row grp', 'aria-expanded': String(isOpen), onclick: () => { if (isOpen) open.delete(g.code); else open.add(g.code); draw(); } },
+            h('span', { class: 'cc' }, g.code), h('span', { class: 'nm' }, nm(g)), ico(isOpen ? 'down' : 'chev', 'sm')));
+          if (isOpen) for (const a of SUBS.filter(x => x.grp === g.code)) rows.append(row(a, true));
+        }
+        list.append(h('div', { class: 'psec' }, `${s.dg} · ${s.ru}`), rows);
+      }
+    };
+    inp.addEventListener('input', () => { query = inp.value; draw(); });
+    inp.addEventListener('keydown', ev => {
+      if (ev.key !== 'Enter') return;
+      ev.preventDefault();
+      const v = inp.value.trim();
+      if (BY[v] && !BY[v].isGroup && v.length === 4) choose(v);
+      else { const first = list.querySelector('.pk-row:not(.grp)'); if (first) first.click(); }
+    });
+    body.append(h('div', { class: 'searchbox psearch' }, ico('search'), inp), list);
+    draw();
+    if (matchMedia('(hover: hover)').matches) setTimeout(() => inp.focus(), 60);
+  }, () => onPick(picked), { foot: false, cls: 'pick' });
 }
 // the three-step recipe for any entry, with the debit/credit table
 function howTo() {
@@ -1741,10 +1827,23 @@ const EntView = {
   choose(i) { const q = this.r && this.r.q; if (!q || q.done) return; q.pick = i; this.finish(q.opts[i].ok); },
   submit() {
     const q = this.r && this.r.q; if (!q || q.done) return;
-    const dt = ($('#ent-dt')?.value || '').replace(/\D/g, ''), kt = ($('#ent-kt')?.value || '').replace(/\D/g, '');
-    if (!dt || !kt) { $(!dt ? '#ent-dt' : '#ent-kt')?.focus(); return; }
-    q.dt = dt; q.kt = kt; q.okD = q.e.dc.includes(dt); q.okK = q.e.kc.includes(kt);
+    if (!q.dt || !q.kt) { this.place(!q.dt ? 'd' : 'k'); return; }
+    q.okD = q.e.dc.includes(q.dt); q.okK = q.e.kc.includes(q.kt);
     this.finish(q.okD && q.okK);
+  },
+  place(side) {
+    const q = this.r && this.r.q; if (!q || q.done) return;
+    pickAccount(side, side === 'd' ? q.dt : q.kt, code => {
+      if (code && this.r && this.r.q === q) { q[side === 'd' ? 'dt' : 'kt'] = code; this.render(); }
+      $(q.dt && q.kt ? '#check' : !q.kt ? '#slot-k' : '#slot-d')?.focus({ preventScroll: true });
+    });
+  },
+  swap() { const q = this.r && this.r.q; if (!q || q.done) return; [q.dt, q.kt] = [q.kt, q.dt]; this.render(); $('#check')?.focus({ preventScroll: true }); },
+  switchMode(m, quiet) {
+    setPref('entInput', m);
+    const q = this.r && this.r.q;
+    if (q && !q.done && q.mode !== m) { q.mode = m; q.opts = m === 'choice' ? entOptions(q.e) : null; }
+    if (!quiet) { this.render(); this.after(); }
   },
   advance() { this.r.i++; this.pick(); if (this.r.done) saveRound('entries', this.r); this.render(); toSheetTop(); this.after() || focusNext(); },
   key(e, typing) {
@@ -1769,7 +1868,8 @@ const EntView = {
     const e = q.e;
     inn.append(...qhead('Проводка', r));
     inn.append(h('div', { class: 'prompt' }, h('div', { class: 'ask' }, 'Какая проводка у этой операции?'), h('div', { class: 'txt' }, et(e)),
-      h('div', { class: 'hint' }, q.mode === 'choice' ? 'Выберите пару: какой счёт по дебету и какой по кредиту.' : 'Введите код счёта дебета и код счёта кредита — или начните вводить название.')));
+      h('div', { class: 'hint' }, q.mode === 'choice' ? 'Выберите пару: какой счёт по дебету и какой по кредиту.' : 'Нажмите «Дебет» и выберите счёт из плана счетов, затем — «Кредит».'),
+      q.done ? null : answerBar(q.mode, m => this.switchMode(m))));
     if (q.mode === 'choice') {
       const grid = h('div', { class: 'opts' });
       q.opts.forEach((o, i) => {
@@ -1778,25 +1878,11 @@ const EntView = {
         grid.append(b);
       });
       inn.append(grid);
-    } else {
-      const [fd, inD] = suggestField('ent-dt', 'd', 'Дебет', q, () => $('#ent-kt')?.focus());
-      const [fk, inK] = suggestField('ent-kt', 'k', 'Кредит', q, null);
-      if (q.done) { inD.disabled = inK.disabled = true; inD.classList.add(q.okD ? 'okb' : 'badb'); inK.classList.add(q.okK ? 'okb' : 'badb'); }
-      inK.addEventListener('keydown', ev => { if (ev.key === 'Enter' && !ev.defaultPrevented) { ev.preventDefault(); ev.stopPropagation(); this.submit(); } });
-      inD.addEventListener('keydown', ev => { if (ev.key === 'Enter' && !ev.defaultPrevented) { ev.preventDefault(); ev.stopPropagation(); inK.focus(); } });
-      inn.append(h('div', { class: 'ent-in' }, fd, fk));
-      if (!q.done) inn.append(h('div', { class: 'actions' }, h('button', { type: 'button', class: 'btn pri', onclick: () => this.submit() }, 'Проверить'),
-        h('button', { type: 'button', class: 'btn ghost', onclick: () => { q.gave = true; this.finish(false); } }, 'Не знаю — показать ответ')));
-    }
+    } else inn.append(...placeView(q, s => this.place(s), () => this.swap(), () => this.submit(), () => { q.gave = true; this.finish(false); }));
     if (q.done) {
       const fb = h('div', { class: 'fb ' + (q.ok ? 'ok' : 'bad'), id: 'fb' }, h('h3', null, ico(q.ok ? 'check' : 'cross'), q.ok ? 'Верно!' : q.gave ? 'Правильная проводка' : 'Неверно. Правильная проводка:'));
       fb.append(pairView(e.dt, e.kt, e.dc, e.kc));
-      if (q.mode === 'input' && !q.ok && !q.gave) {
-        const parts = [];
-        if (!q.okD) parts.push(`по дебету вы ввели ${q.dt}${BY[q.dt] ? ' — ' + nm(BY[q.dt]) : ' (такого счёта нет)'}`);
-        if (!q.okK) parts.push(`по кредиту вы ввели ${q.kt}${BY[q.kt] ? ' — ' + nm(BY[q.kt]) : ' (такого счёта нет)'}`);
-        fb.append(h('p', { class: 'note' }, 'Ошибка: ' + parts.join('; ') + '.'));
-      }
+      if (q.mode === 'input') for (const t of placedNotes(q, e)) fb.append(h('p', { class: 'note' }, t));
       if (q.mode === 'choice' && !q.ok && q.pick != null) { const m = choiceMeaning(q.opts[q.pick], e); if (m) fb.append(h('p', { class: 'note' }, m)); }
       if (e.dc.length > 1 || e.kc.length > 1) fb.append(h('p', { class: 'note' }, 'Указан диапазон кодов — подходит любой субсчёт из него. Какой именно, зависит от того, что за имущество, долг или расход в операции.'));
       const w = q.why ? explainView(e) : null;
@@ -1809,7 +1895,7 @@ const EntView = {
         nextBtn(r, () => this.advance())));
     } else if (q.mode === 'choice') inn.append(h('p', { class: 'kbd' }, 'Клавиши 1–4 — выбрать ответ'));
   },
-  after() { const q = this.r && this.r.q; if (q && !q.done && q.mode === 'input') { const i = $('#ent-dt'); if (i) { i.focus({ preventScroll: true }); return true; } } return false; }
+  after() { const q = this.r && this.r.q; if (q && !q.done && q.mode === 'input') { const b = $(q.dt && q.kt ? '#check' : !q.dt ? '#slot-d' : '#slot-k'); if (b) { b.focus({ preventScroll: true }); return true; } } return false; }
 };
 
 /* ---------- mode: reference ---------- */
@@ -2346,7 +2432,6 @@ const CaseView = {
     const c = this.c;
     if (this.sub === 'list' || !c) { this.sub = 'list'; return this.list(m); }
     const bar = h('div', { class: 'toolbar' }, h('button', { type: 'button', class: 'btn ghost sm', onclick: () => this.back() }, ico('back', 'sm'), this.sub === 'intro' ? 'Все примеры' : 'К описанию примера'));
-    if (this.sub === 'solve' && !(this.st(c.id) || {}).done) bar.append(h('button', { type: 'button', class: 'pillbtn', 'aria-label': 'Как отвечать', onclick: () => openSettings('cases') }, ico('sliders'), h('span', null, P.entInput === 'choice' ? 'Ответ: выбор из 4' : 'Ответ: ввод кодов')));
     m.append(bar);
     if (this.sub === 'intro') this.intro(m, c);
     else if (this.sub === 'read') this.read(m, c);
@@ -2402,7 +2487,8 @@ const CaseView = {
     inn.append(...qhead('Операция', { i: s.i, n, res: s.res.filter(x => x != null).map(ok => ({ ok })) }));
     inn.append(h('div', { class: 'prompt' }, h('div', { class: 'ask' }, `${this.chapter(c, s.i)} · ${c.title}`), h('div', { class: 'txt' }, st.t),
       h('div', { class: 'amt' }, money(st.s), h('small', null, ' сум')),
-      h('div', { class: 'hint' }, q.mode === 'choice' ? 'Какая проводка? Выберите пару: счёт по дебету и счёт по кредиту.' : 'Введите код счёта дебета и код счёта кредита — или начните вводить название.')));
+      h('div', { class: 'hint' }, q.mode === 'choice' ? 'Какая проводка? Выберите пару: счёт по дебету и счёт по кредиту.' : 'Какая проводка? Нажмите «Дебет» и выберите счёт из плана счетов, затем — «Кредит».'),
+      q.done ? null : answerBar(q.mode, md => this.switchMode(md))));
     if (q.mode === 'choice') {
       const grid = h('div', { class: 'opts' });
       q.opts.forEach((o, k) => {
@@ -2411,26 +2497,12 @@ const CaseView = {
         grid.append(b);
       });
       inn.append(grid);
-    } else {
-      const [fd, inD] = suggestField('ent-dt', 'd', 'Дебет', q, () => $('#ent-kt')?.focus());
-      const [fk, inK] = suggestField('ent-kt', 'k', 'Кредит', q, null);
-      if (q.done) { inD.disabled = inK.disabled = true; inD.classList.add(q.okD ? 'okb' : 'badb'); inK.classList.add(q.okK ? 'okb' : 'badb'); }
-      inK.addEventListener('keydown', ev => { if (ev.key === 'Enter' && !ev.defaultPrevented) { ev.preventDefault(); ev.stopPropagation(); this.submit(); } });
-      inD.addEventListener('keydown', ev => { if (ev.key === 'Enter' && !ev.defaultPrevented) { ev.preventDefault(); ev.stopPropagation(); inK.focus(); } });
-      inn.append(h('div', { class: 'ent-in' }, fd, fk));
-      if (!q.done) inn.append(h('div', { class: 'actions' }, h('button', { type: 'button', class: 'btn pri', onclick: () => this.submit() }, 'Проверить'),
-        h('button', { type: 'button', class: 'btn ghost', onclick: () => { q.gave = true; this.finish(false); } }, 'Не знаю — показать ответ')));
-    }
+    } else inn.append(...placeView(q, side => this.place(side), () => this.swap(), () => this.submit(), () => { q.gave = true; this.finish(false); }));
     if (!q.done) { if (q.mode === 'choice') inn.append(h('p', { class: 'kbd' }, 'Клавиши 1–4 — выбрать ответ')); return; }
     const e = stepEnt(st);
     const fb = h('div', { class: 'fb ' + (q.ok ? 'ok' : 'bad'), id: 'fb' }, h('h3', null, ico(q.ok ? 'check' : 'cross'), q.ok ? 'Верно!' : q.gave ? 'Правильная проводка' : 'Неверно. Правильная проводка:'));
     fb.append(h('div', { class: 'step-p' }, pairView(st.dt, st.kt, e.dc, e.kc), h('span', { class: 'amt sm' }, money(st.s), h('small', null, ' сум'))));
-    if (q.mode === 'input' && !q.ok && !q.gave) {
-      const parts = [];
-      if (!q.okD) parts.push(`по дебету вы ввели ${q.dt}${BY[q.dt] ? ' — ' + nm(BY[q.dt]) : ' (такого счёта нет)'}`);
-      if (!q.okK) parts.push(`по кредиту вы ввели ${q.kt}${BY[q.kt] ? ' — ' + nm(BY[q.kt]) : ' (такого счёта нет)'}`);
-      fb.append(h('p', { class: 'note' }, 'Ошибка: ' + parts.join('; ') + '.'));
-    }
+    if (q.mode === 'input') for (const t of placedNotes(q, e)) fb.append(h('p', { class: 'note' }, t));
     if (q.mode === 'choice' && !q.ok && q.pick != null) { const t = choiceMeaning(q.opts[q.pick], e); if (t) fb.append(h('p', { class: 'note' }, t)); }
     const w = explainView(e, { amt: st.s, plain: st.w, sal: stepSal(c, s.i), noExample: true });
     if (w) fb.append(w); else fb.append(h('p', { class: 'step-w' }, st.w));
@@ -2448,11 +2520,24 @@ const CaseView = {
   choose(k) { const q = this.q; if (!q || q.done || !q.opts) return; q.pick = k; this.finish(q.opts[k].ok); },
   submit() {
     const q = this.q, c = this.c; if (!q || q.done || !c) return;
-    const dt = ($('#ent-dt')?.value || '').replace(/\D/g, ''), kt = ($('#ent-kt')?.value || '').replace(/\D/g, '');
-    if (!dt || !kt) { $(!dt ? '#ent-dt' : '#ent-kt')?.focus(); return; }
+    if (!q.dt || !q.kt) { this.place(!q.dt ? 'd' : 'k'); return; }
     const st = c.steps[q.i];
-    q.dt = dt; q.kt = kt; q.okD = dt === st.dt; q.okK = kt === st.kt;
+    q.okD = q.dt === st.dt; q.okK = q.kt === st.kt;
     this.finish(q.okD && q.okK);
+  },
+  place(side) {
+    const q = this.q; if (!q || q.done) return;
+    pickAccount(side, side === 'd' ? q.dt : q.kt, code => {
+      if (code && this.q === q) { q[side === 'd' ? 'dt' : 'kt'] = code; this.render(); }
+      $(q.dt && q.kt ? '#check' : !q.kt ? '#slot-k' : '#slot-d')?.focus({ preventScroll: true });
+    });
+  },
+  swap() { const q = this.q; if (!q || q.done) return; [q.dt, q.kt] = [q.kt, q.dt]; this.render(); $('#check')?.focus({ preventScroll: true }); },
+  switchMode(md) {
+    setPref('entInput', md);
+    const q = this.q, c = this.c;
+    if (q && !q.done && q.mode !== md && c) { q.mode = md; q.opts = md === 'choice' ? caseOptions(c.steps[q.i]) : null; }
+    this.render(); this.after();
   },
   advance() {
     const c = this.c, s = c && this.st(c.id); if (!s) return;
@@ -2502,7 +2587,7 @@ const CaseView = {
     if (!typing && q && !q.done && q.mode === 'choice' && /^[1-4]$/.test(e.key)) { e.preventDefault(); this.choose(+e.key - 1); }
     else if (!typing && e.key === 'Enter' && q && q.done && document.activeElement?.id !== 'next') { e.preventDefault(); $('#next')?.click(); }
   },
-  after() { const q = this.q; if (this.sub === 'solve' && q && !q.done && q.mode === 'input') { const i = $('#ent-dt'); if (i) { i.focus({ preventScroll: true }); return true; } } return false; }
+  after() { const q = this.q; if (this.sub === 'solve' && q && !q.done && q.mode === 'input') { const b = $(q.dt && q.kt ? '#check' : !q.dt ? '#slot-d' : '#slot-k'); if (b) { b.focus({ preventScroll: true }); return true; } } return false; }
 };
 
 /* ---------- shell ---------- */
